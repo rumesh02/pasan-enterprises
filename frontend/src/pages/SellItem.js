@@ -104,7 +104,7 @@ const SellItem = () => {
       return;
     }
     
-    alert(`Sale processed successfully! Total: $${getTotalAmount().toFixed(2)}`);
+    alert(`Sale processed successfully! Total: Rs. ${getTotalAmount().toFixed(2)}`);
     setCart([]);
     setCustomerInfo({ name: '', email: '', phone: '', address: '' });
   };
@@ -149,7 +149,7 @@ const SellItem = () => {
                   <h4 className="font-semibold text-slate-800 mb-1">{item.name}</h4>
                   <p className="text-slate-600 text-sm mb-2">{item.category}</p>
                   <div className="flex items-center justify-between">
-                    <span className="text-lg font-bold text-slate-800">${item.price.toFixed(2)}</span>
+                    <span className="text-lg font-bold text-slate-800">Rs. {item.price.toFixed(2)}</span>
                     <button
                       onClick={() => addToCart(item)}
                       disabled={item.stock === 0}
@@ -205,7 +205,7 @@ const SellItem = () => {
                         </button>
                       </div>
                       <span className="text-sm font-bold text-slate-800">
-                        ${(item.price * item.quantity).toFixed(2)}
+                        Rs. {(item.price * item.quantity).toFixed(2)}
                       </span>
                     </div>
                   </div>
@@ -214,7 +214,7 @@ const SellItem = () => {
                 <div className="border-t border-slate-200 pt-4">
                   <div className="flex justify-between items-center text-lg font-bold text-slate-800">
                     <span>Total:</span>
-                    <span>${getTotalAmount().toFixed(2)}</span>
+                    <span>Rs. {getTotalAmount().toFixed(2)}</span>
                   </div>
                 </div>
               </div>

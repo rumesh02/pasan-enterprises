@@ -10,7 +10,7 @@ const Dashboard = () => {
   const stats = [
     {
       title: 'Total Inventory Value',
-      value: '$2,450,000',
+      value: 'Rs. 2,450,000',
       change: '+12.5%',
       changeType: 'positive',
       icon: CurrencyDollarIcon,
