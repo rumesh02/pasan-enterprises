@@ -1,22 +1,64 @@
-import logo from './logo.svg';
+import React, { useState } from 'react';
+import Sidebar from './components/Sidebar';
+import Dashboard from './pages/Dashboard';
+import ViewInventory from './pages/ViewInventory';
+import SellItem from './pages/SellItem';
+import PastOrders from './pages/PastOrders';
+import AddInventory from './pages/AddInventory';
 
 function App() {
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [activeTab, setActiveTab] = useState('dashboard');
+
+  const renderPage = () => {
+    switch (activeTab) {
+      case 'dashboard':
+        return <Dashboard />;
+      case 'view-inventory':
+        return <ViewInventory />;
+      case 'sell-item':
+        return <SellItem />;
+      case 'past-orders':
+        return <PastOrders />;
+      case 'add-inventory':
+        return <AddInventory />;
+      default:
+        return <Dashboard />;
+    }
+  };
+
   return (
-    <div className="text-center bg-gray-800 min-h-screen flex flex-col items-center justify-center">
-      <header className="text-white">
-        <img src={logo} className="h-40 w-40 mx-auto animate-spin" alt="logo" />
-        <p className="text-lg mt-4">
-          Edit <code className="bg-gray-600 px-2 py-1 rounded">src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="text-blue-400 hover:text-blue-300 transition-colors duration-200 inline-block mt-4"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+    <div className="flex h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+      {/* Sidebar */}
+      <Sidebar 
+        isCollapsed={sidebarCollapsed} 
+        setIsCollapsed={setSidebarCollapsed}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+      />
+      
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col">
+        {/* Header */}
+        <header className="bg-white/80 backdrop-blur-sm shadow-sm border-b border-slate-200/50 px-8 py-5">
+          <div className="flex items-center justify-between">
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent">
+              Inventory Management System
+            </h1>
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                <span className="text-sm text-slate-600 font-medium">Online</span>
+              </div>
+            </div>
+          </div>
+        </header>
+        
+        {/* Main Content */}
+        <main className="flex-1 overflow-auto">
+          {renderPage()}
+        </main>
+      </div>
     </div>
   );
 }
