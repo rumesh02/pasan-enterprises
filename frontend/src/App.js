@@ -10,7 +10,7 @@ import Login from './pages/auth/Login';
 function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false); // Set to false to see the new login design
 
   const renderPage = () => {
     switch (activeTab) {

@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-import authService from '../../services/authService';
 
-const Login = () => {
+const Login = ({ onLogin }) => {
   const [formData, setFormData] = useState({
     email: '',
     password: ''
@@ -55,19 +54,34 @@ const Login = () => {
     setErrors({}); // Clear any previous errors
     
     try {
-      const result = await authService.login(formData.email, formData.password);
+      // Simple hardcoded authentication - you can change these credentials
+      const validEmail = 'admin@pasan.com';
+      const validPassword = 'admin123';
       
-      // Success handling
-      console.log('Login successful:', result);
-      alert(`Welcome back, ${result.user?.name || 'User'}!`);
-      
-      // Here you would typically redirect to dashboard
-      // For now, we'll just reset the form
-      setFormData({ email: '', password: '' });
+      // Check credentials
+      if (formData.email === validEmail && formData.password === validPassword) {
+        console.log('Login successful!');
+        
+        // Store login state in localStorage (optional)
+        localStorage.setItem('isLoggedIn', 'true');
+        localStorage.setItem('userEmail', formData.email);
+        
+        // Call the onLogin callback to redirect to dashboard
+        if (onLogin) {
+          onLogin();
+        }
+        
+        // Reset form
+        setFormData({ email: '', password: '' });
+        
+      } else {
+        // Invalid credentials
+        setErrors({ general: 'Invalid email or password. Please try again.' });
+      }
       
     } catch (error) {
       console.error('Login error:', error);
-      setErrors({ general: error.message || 'Login failed. Please try again.' });
+      setErrors({ general: 'An unexpected error occurred. Please try again.' });
     } finally {
       setIsLoading(false);
     }
