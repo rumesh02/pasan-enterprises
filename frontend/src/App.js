@@ -5,6 +5,7 @@ import ViewInventory from './pages/ViewInventory';
 import SellItem from './pages/SellItem';
 import PastOrders from './pages/PastOrders';
 import AddInventory from './pages/AddInventory';
+import Customers from './pages/Customers';
 import Login from './pages/auth/Login';
 
 function App() {
@@ -24,6 +25,8 @@ function App() {
         return <PastOrders />;
       case 'add-inventory':
         return <AddInventory />;
+      case 'customers':
+        return <Customers />;
       default:
         return <Dashboard />;
     }
