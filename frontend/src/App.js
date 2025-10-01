@@ -7,7 +7,6 @@ import PastOrders from './pages/PastOrders';
 import AddInventory from './pages/AddInventory';
 import Customers from './pages/Customers';
 import Login from './pages/auth/Login';
-import authService from './services/authService';
 
 function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);

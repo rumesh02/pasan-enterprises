@@ -42,11 +42,17 @@ app.get('/health', (req, res) => {
 const userRoutes = require('./routes/users');
 const productRoutes = require('./routes/products');
 const machineRoutes = require('./routes/machines');
+const customerRoutes = require('./routes/customers');
+const salesRoutes = require('./routes/sales');
+const pastOrderRoutes = require('./routes/pastOrders');
 
 // Use routes
 app.use('/api/users', userRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/machines', machineRoutes);
+app.use('/api/customers', customerRoutes);
+app.use('/api/sales', salesRoutes);
+app.use('/api/past-orders', pastOrderRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
