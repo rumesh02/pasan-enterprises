@@ -41,10 +41,12 @@ app.get('/health', (req, res) => {
 // Import route files
 const userRoutes = require('./routes/users');
 const productRoutes = require('./routes/products');
+const machineRoutes = require('./routes/machines');
 
 // Use routes
 app.use('/api/users', userRoutes);
 app.use('/api/products', productRoutes);
+app.use('/api/machines', machineRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

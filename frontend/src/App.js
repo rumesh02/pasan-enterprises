@@ -1,16 +1,26 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import Dashboard from './pages/Dashboard';
 import ViewInventory from './pages/ViewInventory';
 import SellItem from './pages/SellItem';
 import PastOrders from './pages/PastOrders';
 import AddInventory from './pages/AddInventory';
+import Customers from './pages/Customers';
 import Login from './pages/auth/Login';
+import authService from './services/authService';
 
 function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [isAuthenticated, setIsAuthenticated] = useState(false); // Set to false to see the new login design
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(true); // Add loading state for initial auth check
+
+  useEffect(() => {
+    // Check authentication state on mount
+    const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
+    setIsAuthenticated(isLoggedIn);
+    setIsLoading(false);
+  }, []);
 
   const renderPage = () => {
     switch (activeTab) {
@@ -24,13 +34,17 @@ function App() {
         return <PastOrders />;
       case 'add-inventory':
         return <AddInventory />;
+      case 'customers':
+        return <Customers />;
       default:
         return <Dashboard />;
     }
   };
 
   const handleLogout = () => {
-    // If you have cleanup (tokens, localStorage), do it here
+    // Clear localStorage items
+    localStorage.removeItem('isLoggedIn');
+    localStorage.removeItem('userEmail');
     setIsAuthenticated(false);
     setActiveTab('dashboard');
   };
@@ -39,6 +53,15 @@ function App() {
   const handleLoginSuccess = () => {
     setIsAuthenticated(true);
   };
+
+  // Show loading spinner while checking auth
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100">
+        <div className="text-xl text-slate-600">Loading...</div>
+      </div>
+    );
+  }
 
   // If not authenticated, show Login centered on the screen
   if (!isAuthenticated) {
