@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { 
   ChartBarIcon, 
   EyeIcon, 
@@ -7,7 +7,7 @@ import {
   PlusIcon,
   UsersIcon,
   ChevronLeftIcon,
-  ChevronRightIcon 
+  ChevronRightIcon
 } from '@heroicons/react/24/outline';
 
 const Sidebar = ({ isCollapsed, setIsCollapsed, activeTab, setActiveTab }) => {
