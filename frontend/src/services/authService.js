@@ -1,4 +1,4 @@
-const API_BASE_URL = 'https://16.16.24.8:5000/api';
+const API_BASE_URL = 'https://pasan-enterprises.me/api';
 
 class AuthService {
   // Login user
