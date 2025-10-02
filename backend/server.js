@@ -65,10 +65,11 @@ app.use((err, req, res, next) => {
 });
 
 // Start server
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`🌐 API available at: http://localhost:${PORT}`);
-  console.log(`📚 Health check: http://localhost:${PORT}/health`);
+  console.log(`🌐 API available at: http://<EC2_PUBLIC_IP>:${PORT}`);
+  console.log(`📚 Health check: http://<EC2_PUBLIC_IP}:${PORT}/health`);
 });
+
 
 module.exports = app;
