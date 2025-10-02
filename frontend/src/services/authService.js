@@ -2,14 +2,14 @@ const API_BASE_URL = 'http://localhost:5000/api';
 
 class AuthService {
   // Login user
-  async login(email, password) {
+  async login(username, password) {
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/login`, {
+      const response = await fetch(`${API_BASE_URL}/users/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ username, password }),
       });
 
       const data = await response.json();
@@ -18,10 +18,11 @@ class AuthService {
         throw new Error(data.message || 'Login failed');
       }
 
-      // Store token in localStorage
-      if (data.token) {
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
+      // Store token and user data in sessionStorage (clears on browser close)
+      if (data.success && data.data.token) {
+        sessionStorage.setItem('authToken', data.data.token);
+        sessionStorage.setItem('user', JSON.stringify(data.data.user));
+        sessionStorage.setItem('isLoggedIn', 'true');
       }
 
       return data;
@@ -55,14 +56,20 @@ class AuthService {
 
   // Logout user
   logout() {
+    sessionStorage.removeItem('authToken');
+    sessionStorage.removeItem('user');
+    sessionStorage.removeItem('isLoggedIn');
+    // Also cleanup any old localStorage data
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('isLoggedIn');
   }
 
   // Get current user
   getCurrentUser() {
     try {
-      const user = localStorage.getItem('user');
+      const user = sessionStorage.getItem('user');
       return user ? JSON.parse(user) : null;
     } catch (error) {
       return null;
@@ -71,7 +78,7 @@ class AuthService {
 
   // Get auth token
   getToken() {
-    return localStorage.getItem('token');
+    return sessionStorage.getItem('authToken');
   }
 
   // Check if user is authenticated

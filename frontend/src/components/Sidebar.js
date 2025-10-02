@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { 
   ChartBarIcon, 
   EyeIcon, 
   ShoppingCartIcon, 
   ClockIcon, 
   PlusIcon,
+  UsersIcon,
   ChevronLeftIcon,
-  ChevronRightIcon 
+  ChevronRightIcon
 } from '@heroicons/react/24/outline';
 
 const Sidebar = ({ isCollapsed, setIsCollapsed, activeTab, setActiveTab }) => {
@@ -41,6 +42,12 @@ const Sidebar = ({ isCollapsed, setIsCollapsed, activeTab, setActiveTab }) => {
       name: 'Add Inventory',
       icon: PlusIcon,
       gradient: 'from-teal-500 to-teal-600',
+    },
+    {
+      id: 'customers',
+      name: 'Customers',
+      icon: UsersIcon,
+      gradient: 'from-pink-500 to-pink-600',
     },
   ];
 
