@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://16.16.24.8:443/api';
+const API_BASE_URL = 'https://16.16.24.8:443/api';
 
 // Machine API Service
 export const machineService = {
