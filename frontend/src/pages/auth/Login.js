@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
+import authService from '../../services/authService';
 
 const Login = ({ onLogin }) => {
   const [formData, setFormData] = useState({
-    email: '',
+    username: '',
     password: ''
   });
   const [errors, setErrors] = useState({});
@@ -26,10 +27,10 @@ const Login = ({ onLogin }) => {
   const validateForm = () => {
     const newErrors = {};
     
-    if (!formData.email) {
-      newErrors.email = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Email is invalid';
+    if (!formData.username) {
+      newErrors.username = 'Username is required';
+    } else if (formData.username.length < 3) {
+      newErrors.username = 'Username must be at least 3 characters';
     }
     
     if (!formData.password) {
@@ -54,17 +55,11 @@ const Login = ({ onLogin }) => {
     setErrors({}); // Clear any previous errors
     
     try {
-      // Simple hardcoded authentication - you can change these credentials
-      const validEmail = 'admin@pasan.com';
-      const validPassword = 'admin123';
+      // Call the backend login API
+      const response = await authService.login(formData.username, formData.password);
       
-      // Check credentials
-      if (formData.email === validEmail && formData.password === validPassword) {
-        console.log('Login successful!');
-        
-        // Store login state in localStorage (optional)
-        localStorage.setItem('isLoggedIn', 'true');
-        localStorage.setItem('userEmail', formData.email);
+      if (response.success) {
+        console.log('Login successful!', response.data.user);
         
         // Call the onLogin callback to redirect to dashboard
         if (onLogin) {
@@ -72,16 +67,15 @@ const Login = ({ onLogin }) => {
         }
         
         // Reset form
-        setFormData({ email: '', password: '' });
+        setFormData({ username: '', password: '' });
         
       } else {
-        // Invalid credentials
-        setErrors({ general: 'Invalid email or password. Please try again.' });
+        setErrors({ general: response.message || 'Login failed. Please try again.' });
       }
       
     } catch (error) {
       console.error('Login error:', error);
-      setErrors({ general: 'An unexpected error occurred. Please try again.' });
+      setErrors({ general: error.message || 'An unexpected error occurred. Please try again.' });
     } finally {
       setIsLoading(false);
     }
@@ -139,31 +133,31 @@ const Login = ({ onLogin }) => {
               )}
 
               <div className="space-y-4">
-                {/* Email Field */}
+                {/* Username Field */}
                 <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                    Email Address
+                  <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
+                    Username
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                       <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                       </svg>
                     </div>
                     <input
-                      id="email"
-                      name="email"
-                      type="email"
-                      value={formData.email}
+                      id="username"
+                      name="username"
+                      type="text"
+                      value={formData.username}
                       onChange={handleChange}
                       className={`w-full pl-10 pr-4 py-3 border ${
-                        errors.email ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
+                        errors.username ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
                       } rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 transition-all duration-200`}
-                      placeholder="Enter your email"
+                      placeholder="Enter your username"
                     />
                   </div>
-                  {errors.email && (
-                    <p className="mt-1 text-red-600 text-sm">{errors.email}</p>
+                  {errors.username && (
+                    <p className="mt-1 text-red-600 text-sm">{errors.username}</p>
                   )}
                 </div>
 

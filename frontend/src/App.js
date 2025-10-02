@@ -16,8 +16,12 @@ function App() {
 
   useEffect(() => {
     // Check authentication state on mount
-    const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
-    setIsAuthenticated(isLoggedIn);
+    // Use sessionStorage instead of localStorage for browser closure logout
+    const isLoggedIn = sessionStorage.getItem('isLoggedIn') === 'true';
+    const authToken = sessionStorage.getItem('authToken');
+    
+    // Only set authenticated if both conditions are met
+    setIsAuthenticated(isLoggedIn && !!authToken);
     setIsLoading(false);
   }, []);
 
@@ -41,9 +45,14 @@ function App() {
   };
 
   const handleLogout = () => {
-    // Clear localStorage items
-    localStorage.removeItem('isLoggedIn');
-    localStorage.removeItem('userEmail');
+    // Clear all storage items (both sessionStorage and localStorage for cleanup)
+    sessionStorage.removeItem('isLoggedIn');
+    sessionStorage.removeItem('authToken');
+    sessionStorage.removeItem('user');
+    localStorage.removeItem('isLoggedIn'); // cleanup old localStorage data
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('user');
+    localStorage.removeItem('userEmail'); // legacy cleanup
     setIsAuthenticated(false);
     setActiveTab('dashboard');
   };
@@ -65,10 +74,7 @@ function App() {
   // If not authenticated, show Login centered on the screen
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100">
-        {/* Pass onLogin prop — your Login component should call props.onLogin() after successful authentication */}
-        <Login onLogin={handleLoginSuccess} />
-      </div>
+      <Login onLogin={handleLoginSuccess} />
     );
   }
 
