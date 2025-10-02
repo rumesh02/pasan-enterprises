@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   ShoppingCartIcon, 
   MagnifyingGlassIcon, 
@@ -8,7 +8,8 @@ import {
   CheckCircleIcon,
   ExclamationTriangleIcon,
   XMarkIcon,
-  DocumentIcon
+  CalculatorIcon,
+  ReceiptPercentIcon
 } from '@heroicons/react/24/outline';
 import { machineAPI, salesAPI, handleApiError } from '../services/apiService';
 
@@ -29,20 +30,40 @@ const SellItem = () => {
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
-  const [validation, setValidation] = useState(null);
 
-  // Fetch machines and categories on component mount
-  useEffect(() => {
-    fetchMachines();
-    fetchCategories();
-  }, []);
+  
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalMachines, setTotalMachines] = useState(0);
+  const itemsPerPage = 3;
+  
+  // VAT and Discount states
+  const [vatRate, setVatRate] = useState(15); // 15% VAT
+  const [discountPercentage, setDiscountPercentage] = useState(0);
 
-  const fetchMachines = async () => {
+  const fetchMachines = useCallback(async (page = currentPage, category = selectedCategory, search = searchTerm) => {
     try {
       setLoading(true);
-      const response = await machineAPI.getAll({ inStock: true });
+      const params = {
+        page,
+        limit: itemsPerPage,
+        inStock: true
+      };
+
+      if (category !== 'all') {
+        params.category = category;
+      }
+
+      if (search.trim()) {
+        params.search = search.trim();
+      }
+
+      const response = await machineAPI.getAll(params);
       if (response.data.success) {
         setMachines(response.data.data);
+        setTotalPages(response.data.pages || 1);
+        setTotalMachines(response.data.total || 0);
       }
     } catch (err) {
       const errorInfo = handleApiError(err);
@@ -50,7 +71,18 @@ const SellItem = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentPage, selectedCategory, searchTerm, itemsPerPage]);
+
+  // Fetch machines and categories on component mount
+  useEffect(() => {
+    fetchMachines();
+    fetchCategories();
+  }, [fetchMachines]);
+
+  // Fetch machines when page, category, or search changes
+  useEffect(() => {
+    fetchMachines();
+  }, [fetchMachines]);
 
   const fetchCategories = async () => {
     try {
@@ -63,16 +95,20 @@ const SellItem = () => {
     }
   };
 
-  // Filter machines based on search and category
-  const filteredMachines = machines.filter(machine => {
-    const matchesSearch = machine.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         machine.itemId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         machine.description.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesCategory = selectedCategory === 'all' || machine.category === selectedCategory;
-    
-    return matchesSearch && matchesCategory && machine.quantity > 0;
-  });
+  // Pagination functions
+  const handlePageChange = (newPage) => {
+    setCurrentPage(newPage);
+  };
+
+  const handleCategoryChange = (category) => {
+    setSelectedCategory(category);
+    setCurrentPage(1); // Reset to first page when filtering
+  };
+
+  const handleSearchChange = (search) => {
+    setSearchTerm(search);
+    setCurrentPage(1); // Reset to first page when searching
+  };
 
   const addToCart = (machine) => {
     const existingItem = cart.find(item => item.machineId === machine._id);
@@ -143,13 +179,27 @@ const SellItem = () => {
     return cart.reduce((total, item) => total + (item.unitPrice * item.quantity), 0);
   };
 
+  const getVATAmount = () => {
+    return (getSubtotal() * vatRate) / 100;
+  };
+
+  const getTotalBeforeDiscount = () => {
+    return getSubtotal() + getVATAmount();
+  };
+
+  const getDiscountAmount = () => {
+    return (getTotalBeforeDiscount() * discountPercentage) / 100;
+  };
+
   const getExtrasTotal = () => {
     return extras.reduce((total, extra) => total + (extra.amount || 0), 0);
   };
 
-  const getTotalAmount = () => {
-    return getSubtotal() + getExtrasTotal();
+  const getFinalTotal = () => {
+    return getTotalBeforeDiscount() - getDiscountAmount() + getExtrasTotal();
   };
+
+
 
   const validateSale = async () => {
     try {
@@ -170,8 +220,6 @@ const SellItem = () => {
       console.log('Validation response:', response);
       
       if (response.data && response.data.success) {
-        setValidation(response.data.data);
-        
         // If validation failed, show specific errors
         if (!response.data.data.isValid) {
           const errors = response.data.data.errors || [];
@@ -250,6 +298,8 @@ const SellItem = () => {
           quantity: item.quantity
         })),
         extras: extras.filter(extra => extra.description && extra.amount > 0),
+        vatRate: vatRate,
+        discountPercentage: discountPercentage,
         notes: '',
         processedBy: 'Admin'
       };
@@ -264,7 +314,6 @@ const SellItem = () => {
         setCart([]);
         setExtras([]);
         setCustomerInfo({ name: '', email: '', phone: '', nic: '' });
-        setValidation(null);
         
         // Refresh machines to get updated stock
         await fetchMachines();
@@ -323,10 +372,11 @@ const SellItem = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* First Row: Items and Cart Side by Side */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         {/* Product Selection */}
-        <div className="lg:col-span-2">
-          <div className="bg-white/60 backdrop-blur-sm rounded-2xl shadow-xl border border-slate-200/50 p-6 mb-6">
+        <div className="lg:col-span-1">
+          <div className="bg-white/60 backdrop-blur-sm rounded-2xl shadow-xl border border-slate-200/50 p-6 h-full">
             <h3 className="text-xl font-bold text-slate-800 mb-4">Available Machines</h3>
             
             {/* Search and Filter */}
@@ -337,13 +387,13 @@ const SellItem = () => {
                   type="text"
                   placeholder="Search machines..."
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => handleSearchChange(e.target.value)}
                   className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/50"
                 />
               </div>
               <select
                 value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
+                onChange={(e) => handleCategoryChange(e.target.value)}
                 className="px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/50"
               >
                 <option value="all">All Categories</option>
@@ -363,217 +413,350 @@ const SellItem = () => {
               </div>
             )}
 
+            {/* Pagination Info */}
+            <div className="flex justify-between items-center mb-4">
+              <p className="text-sm text-slate-600">
+                Showing page {currentPage} of {totalPages} ({totalMachines} total items)
+              </p>
+            </div>
+
             {/* Items Grid */}
             {!loading && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {filteredMachines.length === 0 ? (
+              <div className="space-y-4">
+                {machines.length === 0 ? (
                   <div className="col-span-full text-center py-8">
                     <p className="text-slate-600">No machines found matching your criteria.</p>
                   </div>
                 ) : (
-                  filteredMachines.map((machine) => (
-                    <div key={machine._id} className="border border-slate-200 rounded-xl p-4 hover:shadow-lg transition-all duration-200 bg-white/50">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="text-2xl">🔧</div>
-                        <div className="text-right">
-                          <span className={`text-xs px-2 py-1 rounded-full ${
-                            machine.quantity > 10 ? 'bg-green-100 text-green-600' :
-                            machine.quantity > 5 ? 'bg-yellow-100 text-yellow-600' :
-                            'bg-red-100 text-red-600'
-                          }`}>
-                            Stock: {machine.quantity}
-                          </span>
-                        </div>
-                      </div>
-                      <h4 className="font-semibold text-slate-800 mb-1">{machine.name}</h4>
-                      <p className="text-slate-600 text-xs mb-1">ID: {machine.itemId}</p>
-                      <p className="text-slate-600 text-sm mb-2">{machine.category}</p>
+                  machines.map((machine) => (
+                    <div key={machine._id} className="border border-slate-200 rounded-lg p-3 hover:shadow-md transition-all duration-200 bg-white/50">
                       <div className="flex items-center justify-between">
-                        <span className="text-lg font-bold text-slate-800">Rs. {machine.price.toFixed(2)}</span>
-                        <button
-                          onClick={() => addToCart(machine)}
-                          disabled={machine.quantity === 0}
-                          className="px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-                        >
-                          Add to Cart
-                        </button>
+                        <div className="flex-1">
+                          <h4 className="font-semibold text-slate-800 mb-1 text-sm">{machine.name}</h4>
+                          <div className="flex items-center justify-between">
+                            <span className="text-base font-bold text-slate-800">Rs. {machine.price.toFixed(2)}</span>
+                            <span className={`text-xs px-2 py-1 rounded-full ${
+                              machine.quantity > 10 ? 'bg-green-100 text-green-600' :
+                              machine.quantity > 5 ? 'bg-yellow-100 text-yellow-600' :
+                              'bg-red-100 text-red-600'
+                            }`}>
+                              Stock: {machine.quantity}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="ml-3">
+                          <button
+                            onClick={() => addToCart(machine)}
+                            disabled={machine.quantity === 0}
+                            className="px-3 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm whitespace-nowrap"
+                          >
+                            Add to Cart
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))
                 )}
               </div>
             )}
+
+            {/* Pagination Controls */}
+            {!loading && totalPages > 1 && (
+              <div className="mt-4 flex items-center justify-center space-x-2">
+                <button
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 text-sm border border-slate-300 rounded hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+                
+                {(() => {
+                  const pages = [];
+                  const maxPagesToShow = 5;
+                  let startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2));
+                  let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
+                  
+                  if (endPage - startPage < maxPagesToShow - 1) {
+                    startPage = Math.max(1, endPage - maxPagesToShow + 1);
+                  }
+                  
+                  for (let i = startPage; i <= endPage; i++) {
+                    pages.push(i);
+                  }
+                  
+                  return pages.map((page) => (
+                    <button
+                      key={page}
+                      onClick={() => handlePageChange(page)}
+                      className={`px-3 py-1 text-sm rounded ${
+                        currentPage === page
+                          ? 'bg-blue-500 text-white'
+                          : 'border border-slate-300 hover:bg-slate-50'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ));
+                })()}
+                
+                <button
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1 text-sm border border-slate-300 rounded hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Cart and Customer Info */}
+        {/* Cart Section with VAT/Discount and Extra Charges */}
         <div className="lg:col-span-1">
-          {/* Cart */}
-          <div className="bg-white/60 backdrop-blur-sm rounded-2xl shadow-xl border border-slate-200/50 p-6 mb-6">
-            <h3 className="text-xl font-bold text-slate-800 mb-4 flex items-center">
-              <ShoppingCartIcon className="w-6 h-6 mr-2" />
-              Cart ({cart.length})
-            </h3>
-            
-            {cart.length === 0 ? (
-              <p className="text-slate-500 text-center py-8">No items in cart</p>
-            ) : (
-              <div className="space-y-4">
-                {cart.map((item) => (
-                  <div key={item.machineId} className="border border-slate-200 rounded-lg p-3 bg-white/50">
-                    <div className="flex justify-between items-start mb-2">
-                      <div>
-                        <h5 className="font-medium text-slate-800 text-sm">{item.name}</h5>
-                        <p className="text-xs text-slate-600">ID: {item.itemId}</p>
+          <div className="space-y-4 h-full">
+            {/* Cart */}
+            <div className="bg-white/60 backdrop-blur-sm rounded-2xl shadow-xl border border-slate-200/50 p-6">
+                <h3 className="text-xl font-bold text-slate-800 mb-4 flex items-center">
+                  <ShoppingCartIcon className="w-6 h-6 mr-2" />
+                  Cart ({cart.length})
+                </h3>
+                
+                {cart.length === 0 ? (
+                  <p className="text-slate-500 text-center py-8">No items in cart</p>
+                ) : (
+                  <div className="space-y-4">
+                    {cart.map((item) => (
+                      <div key={item.machineId} className="border border-slate-200 rounded-lg p-3 bg-white/50">
+                        <div className="flex justify-between items-start mb-2">
+                          <div>
+                            <h5 className="font-medium text-slate-800 text-sm">{item.name}</h5>
+                            <p className="text-xs text-slate-600">ID: {item.itemId}</p>
+                          </div>
+                          <button
+                            onClick={() => removeFromCart(item.machineId)}
+                            className="text-red-500 hover:text-red-700 text-xs"
+                          >
+                            <XMarkIcon className="w-4 h-4" />
+                          </button>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <button
+                              onClick={() => updateCartQuantity(item.machineId, -1)}
+                              className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center hover:bg-slate-300"
+                            >
+                              <MinusIcon className="w-3 h-3" />
+                            </button>
+                            <span className="text-sm font-medium">{item.quantity}</span>
+                            <button
+                              onClick={() => updateCartQuantity(item.machineId, 1)}
+                              className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center hover:bg-slate-300"
+                            >
+                              <PlusIcon className="w-3 h-3" />
+                            </button>
+                          </div>
+                          <span className="text-sm font-bold text-slate-800">
+                            Rs. {(item.unitPrice * item.quantity).toFixed(2)}
+                          </span>
+                        </div>
                       </div>
+                    ))}
+                    
+                    {/* Cart Totals */}
+                    <div className="border-t border-slate-200 pt-4 space-y-3">
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm text-slate-600">
+                          <span>Subtotal (Items):</span>
+                          <span>Rs. {getSubtotal().toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between text-sm text-slate-600">
+                          <span>VAT ({vatRate}%):</span>
+                          <span>Rs. {getVATAmount().toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between text-sm font-medium text-slate-700">
+                          <span>Total Before Discount:</span>
+                          <span>Rs. {getTotalBeforeDiscount().toFixed(2)}</span>
+                        </div>
+                        {discountPercentage > 0 && (
+                          <div className="flex justify-between text-sm text-green-600">
+                            <span>Discount ({discountPercentage}%):</span>
+                            <span>-Rs. {getDiscountAmount().toFixed(2)}</span>
+                          </div>
+                        )}
+                        {getExtrasTotal() > 0 && (
+                          <div className="flex justify-between text-sm text-slate-600">
+                            <span>Extra Charges:</span>
+                            <span>Rs. {getExtrasTotal().toFixed(2)}</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="border-t border-slate-200 pt-2">
+                        <div className="flex justify-between items-center text-xl font-bold text-slate-800">
+                          <span>Final Total:</span>
+                          <span className="text-green-600">Rs. {getFinalTotal().toFixed(2)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+            {/* VAT and Discount */}
+            <div className="bg-white/60 backdrop-blur-sm rounded-2xl shadow-xl border border-slate-200/50 p-6">
+              <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center">
+                <CalculatorIcon className="w-5 h-5 mr-2" />
+                VAT & Discount
+              </h3>
+              
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">VAT Rate (%)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.1"
+                    value={vatRate}
+                    onChange={(e) => setVatRate(parseFloat(e.target.value) || 0)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/50 text-sm"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Discount (%)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.1"
+                    value={discountPercentage}
+                    onChange={(e) => setDiscountPercentage(parseFloat(e.target.value) || 0)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/50 text-sm"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Extra Charges */}
+            <div className="bg-white/60 backdrop-blur-sm rounded-2xl shadow-xl border border-slate-200/50 p-6">
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="text-lg font-bold text-slate-800 flex items-center">
+                  <ReceiptPercentIcon className="w-5 h-5 mr-2" />
+                  Extra Charges
+                </h3>
+                <button
+                  onClick={addExtra}
+                  className="text-sm bg-blue-500 text-white px-3 py-1 rounded-lg hover:bg-blue-600"
+                >
+                  <PlusIcon className="w-4 h-4 inline mr-1" />
+                  Add
+                </button>
+              </div>
+              
+              {extras.length === 0 ? (
+                <p className="text-slate-500 text-center py-3 text-sm">No extra charges</p>
+              ) : (
+                <div className="space-y-3">
+                  {extras.map((extra, index) => (
+                    <div key={index} className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Description"
+                        value={extra.description}
+                        onChange={(e) => updateExtra(index, 'description', e.target.value)}
+                        className="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white/50"
+                      />
+                      <input
+                        type="number"
+                        placeholder="Amount"
+                        value={extra.amount || ''}
+                        onChange={(e) => updateExtra(index, 'amount', e.target.value)}
+                        className="w-20 px-2 py-2 border border-slate-300 rounded-lg text-sm bg-white/50"
+                      />
                       <button
-                        onClick={() => removeFromCart(item.machineId)}
-                        className="text-red-500 hover:text-red-700 text-xs"
+                        onClick={() => removeExtra(index)}
+                        className="text-red-500 hover:text-red-700 p-2"
                       >
                         <XMarkIcon className="w-4 h-4" />
                       </button>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <button
-                          onClick={() => updateCartQuantity(item.machineId, -1)}
-                          className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center hover:bg-slate-300"
-                        >
-                          <MinusIcon className="w-3 h-3" />
-                        </button>
-                        <span className="text-sm font-medium">{item.quantity}</span>
-                        <button
-                          onClick={() => updateCartQuantity(item.machineId, 1)}
-                          className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center hover:bg-slate-300"
-                        >
-                          <PlusIcon className="w-3 h-3" />
-                        </button>
-                      </div>
-                      <span className="text-sm font-bold text-slate-800">
-                        Rs. {(item.unitPrice * item.quantity).toFixed(2)}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-                
-                {/* Subtotal */}
-                <div className="border-t border-slate-200 pt-4 space-y-2">
-                  <div className="flex justify-between text-sm text-slate-600">
-                    <span>Subtotal:</span>
-                    <span>Rs. {getSubtotal().toFixed(2)}</span>
-                  </div>
-                  {getExtrasTotal() > 0 && (
-                    <div className="flex justify-between text-sm text-slate-600">
-                      <span>Extras:</span>
-                      <span>Rs. {getExtrasTotal().toFixed(2)}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between items-center text-lg font-bold text-slate-800">
-                    <span>Total:</span>
-                    <span>Rs. {getTotalAmount().toFixed(2)}</span>
-                  </div>
+                  ))}
                 </div>
-              </div>
-            )}
-          </div>
-
-          {/* Extra Charges */}
-          <div className="bg-white/60 backdrop-blur-sm rounded-2xl shadow-xl border border-slate-200/50 p-6 mb-6">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold text-slate-800">Extra Charges</h3>
-              <button
-                onClick={addExtra}
-                className="text-sm bg-blue-500 text-white px-3 py-1 rounded-lg hover:bg-blue-600"
-              >
-                <PlusIcon className="w-4 h-4 inline mr-1" />
-                Add
-              </button>
-            </div>
-            
-            {extras.length === 0 ? (
-              <p className="text-slate-500 text-center py-4 text-sm">No extra charges</p>
-            ) : (
-              <div className="space-y-3">
-                {extras.map((extra, index) => (
-                  <div key={index} className="flex gap-2">
-                    <input
-                      type="text"
-                      placeholder="Description"
-                      value={extra.description}
-                      onChange={(e) => updateExtra(index, 'description', e.target.value)}
-                      className="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white/50"
-                    />
-                    <input
-                      type="number"
-                      placeholder="Amount"
-                      value={extra.amount || ''}
-                      onChange={(e) => updateExtra(index, 'amount', e.target.value)}
-                      className="w-24 px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white/50"
-                    />
-                    <button
-                      onClick={() => removeExtra(index)}
-                      className="text-red-500 hover:text-red-700 p-2"
-                    >
-                      <XMarkIcon className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Customer Information */}
-          <div className="bg-white/60 backdrop-blur-sm rounded-2xl shadow-xl border border-slate-200/50 p-6 mb-6">
-            <h3 className="text-xl font-bold text-slate-800 mb-4">Customer Information</h3>
-            <div className="space-y-4">
-              <input
-                type="text"
-                placeholder="Customer Name *"
-                value={customerInfo.name}
-                onChange={(e) => setCustomerInfo({...customerInfo, name: e.target.value})}
-                className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/50"
-                required
-              />
-              <input
-                type="tel"
-                placeholder="Phone *"
-                value={customerInfo.phone}
-                onChange={(e) => setCustomerInfo({...customerInfo, phone: e.target.value})}
-                className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/50"
-                required
-              />
-              <input
-                type="email"
-                placeholder="Email (optional)"
-                value={customerInfo.email}
-                onChange={(e) => setCustomerInfo({...customerInfo, email: e.target.value})}
-                className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/50"
-              />
-              <input
-                type="text"
-                placeholder="NIC (optional)"
-                value={customerInfo.nic}
-                onChange={(e) => setCustomerInfo({...customerInfo, nic: e.target.value})}
-                className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/50"
-              />
+              )}
             </div>
           </div>
+        </div>
+      </div>
 
-          {/* Process Sale Button */}
+      {/* Second Row: Customer Information - Full Width */}
+      <div className="bg-white/60 backdrop-blur-sm rounded-2xl shadow-xl border border-slate-200/50 p-6">
+        <h3 className="text-xl font-bold text-slate-800 mb-6">Customer Information & Complete Sale</h3>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Customer Name *</label>
+            <input
+              type="text"
+              placeholder="Enter customer name"
+              value={customerInfo.name}
+              onChange={(e) => setCustomerInfo({...customerInfo, name: e.target.value})}
+              className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/50"
+              required
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Phone Number *</label>
+            <input
+              type="tel"
+              placeholder="Enter phone number"
+              value={customerInfo.phone}
+              onChange={(e) => setCustomerInfo({...customerInfo, phone: e.target.value})}
+              className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/50"
+              required
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Email (Optional)</label>
+            <input
+              type="email"
+              placeholder="Enter email address"
+              value={customerInfo.email}
+              onChange={(e) => setCustomerInfo({...customerInfo, email: e.target.value})}
+              className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/50"
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">NIC (Optional)</label>
+            <input
+              type="text"
+              placeholder="Enter NIC number"
+              value={customerInfo.nic}
+              onChange={(e) => setCustomerInfo({...customerInfo, nic: e.target.value})}
+              className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/50"
+            />
+          </div>
+        </div>
+
+        {/* Process Sale Button */}
+        <div className="flex justify-center">
           <button
             onClick={handleSale}
             disabled={cart.length === 0 || processing}
-            className="w-full py-4 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-xl font-bold text-lg hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+            className="px-8 py-4 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-xl font-bold text-lg hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shadow-lg"
           >
             {processing ? (
               <>
                 <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                Processing...
+                Processing Sale...
               </>
             ) : (
               <>
                 <CreditCardIcon className="w-6 h-6 mr-2" />
-                Process Sale
+                Complete Sale - Rs. {getFinalTotal().toFixed(2)}
               </>
             )}
           </button>

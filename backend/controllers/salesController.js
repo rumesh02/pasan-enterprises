@@ -18,7 +18,9 @@ const processSale = async (req, res) => {
       items, 
       extras = [], 
       notes = '',
-      processedBy = 'System'
+      processedBy = 'System',
+      vatRate = 15,
+      discountPercentage = 0
     } = req.body;
 
     // Validate required fields
@@ -87,7 +89,14 @@ const processSale = async (req, res) => {
     });
 
     const extrasTotal = processedExtras.reduce((sum, extra) => sum + extra.amount, 0);
-    const total = subtotal + extrasTotal;
+    
+    // Calculate VAT and discount
+    const vatAmount = (subtotal * vatRate) / 100;
+    const totalBeforeDiscount = subtotal + vatAmount;
+    const discountAmount = (totalBeforeDiscount * discountPercentage) / 100;
+    const finalTotal = totalBeforeDiscount - discountAmount + extrasTotal;
+    
+    const total = subtotal + extrasTotal; // Keep for backward compatibility
 
     // Find or create customer
     const customer = await findOrCreateCustomer(customerInfo);
@@ -104,16 +113,22 @@ const processSale = async (req, res) => {
       items: processedItems,
       extras: processedExtras,
       subtotal,
+      vatRate,
+      vatAmount,
+      totalBeforeDiscount,
+      discountPercentage,
+      discountAmount,
       extrasTotal,
       total,
+      finalTotal,
       notes: notes.trim(),
       processedBy
     });
 
     await order.save({ session });
 
-    // Update customer statistics
-    await updateCustomerStats(customer._id, total);
+    // Update customer statistics (use finalTotal for accurate stats)
+    await updateCustomerStats(customer._id, finalTotal);
 
     // Commit transaction
     await session.commitTransaction();
@@ -132,8 +147,14 @@ const processSale = async (req, res) => {
           orderId: order.orderId,
           itemCount: processedItems.reduce((sum, item) => sum + item.quantity, 0),
           subtotal,
+          vatRate,
+          vatAmount,
+          totalBeforeDiscount,
+          discountPercentage,
+          discountAmount,
           extrasTotal,
           total,
+          finalTotal,
           customer: {
             name: customer.name,
             phone: customer.phone

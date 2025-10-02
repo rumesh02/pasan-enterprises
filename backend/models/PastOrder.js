@@ -101,6 +101,33 @@ const pastOrderSchema = new mongoose.Schema({
     required: true,
     min: 0
   },
+  vatRate: {
+    type: Number,
+    default: 15, // 15% VAT
+    min: 0,
+    max: 100
+  },
+  vatAmount: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  totalBeforeDiscount: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  discountPercentage: {
+    type: Number,
+    default: 0,
+    min: 0,
+    max: 100
+  },
+  discountAmount: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
   extrasTotal: {
     type: Number,
     default: 0,
@@ -110,6 +137,11 @@ const pastOrderSchema = new mongoose.Schema({
     type: Number,
     required: true,
     min: [0, 'Total amount cannot be negative']
+  },
+  finalTotal: {
+    type: Number,
+    required: true,
+    min: [0, 'Final total cannot be negative']
   },
   paymentStatus: {
     type: String,
@@ -144,12 +176,34 @@ pastOrderSchema.index({ 'customerInfo.name': 'text' });
 
 // Pre-save middleware to calculate totals
 pastOrderSchema.pre('save', function(next) {
-  // Calculate totals
+  // Calculate subtotal from items
   this.subtotal = this.items.reduce((sum, item) => sum + item.subtotal, 0);
+  
+  // Calculate VAT
+  this.vatAmount = (this.subtotal * this.vatRate) / 100;
+  
+  // Calculate total before discount (subtotal + VAT)
+  this.totalBeforeDiscount = this.subtotal + this.vatAmount;
+  
+  // Calculate discount amount
+  this.discountAmount = (this.totalBeforeDiscount * this.discountPercentage) / 100;
+  
+  // Calculate extras total
   this.extrasTotal = this.extras.reduce((sum, extra) => sum + extra.amount, 0);
+  
+  // Calculate total (for backward compatibility)
   this.total = this.subtotal + this.extrasTotal;
   
-  console.log(`💰 Order totals calculated - Subtotal: ${this.subtotal}, Extras: ${this.extrasTotal}, Total: ${this.total}`);
+  // Calculate final total (totalBeforeDiscount - discount + extras)
+  this.finalTotal = this.totalBeforeDiscount - this.discountAmount + this.extrasTotal;
+  
+  console.log(`💰 Order totals calculated:`);
+  console.log(`   Subtotal: ${this.subtotal}`);
+  console.log(`   VAT (${this.vatRate}%): ${this.vatAmount}`);
+  console.log(`   Total Before Discount: ${this.totalBeforeDiscount}`);
+  console.log(`   Discount (${this.discountPercentage}%): ${this.discountAmount}`);
+  console.log(`   Extras: ${this.extrasTotal}`);
+  console.log(`   Final Total: ${this.finalTotal}`);
   console.log(`🆔 Order ID: ${this.orderId}`);
   
   next();

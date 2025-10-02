@@ -121,6 +121,30 @@ export const pastOrdersAPI = {
   cancel: (id) => api.delete(`/past-orders/${id}`),
 };
 
+// User API
+export const userAPI = {
+  // Login user
+  login: (data) => api.post('/users/login', data),
+  
+  // Get current user profile
+  getCurrentUser: () => api.get('/users/me'),
+  
+  // Get all users
+  getAll: (params = {}) => api.get('/users', { params }),
+  
+  // Get single user by ID
+  getById: (id) => api.get(`/users/${id}`),
+  
+  // Create new user
+  create: (data) => api.post('/users', data),
+  
+  // Update user
+  update: (id, data) => api.put(`/users/${id}`, data),
+  
+  // Delete user
+  delete: (id) => api.delete(`/users/${id}`),
+};
+
 // Error handler utility
 export const handleApiError = (error) => {
   if (error.response) {
