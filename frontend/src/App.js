@@ -7,22 +7,56 @@ import PastOrders from './pages/PastOrders';
 import AddInventory from './pages/AddInventory';
 import Customers from './pages/Customers';
 import Login from './pages/auth/Login';
+import { userAPI } from './services/apiService';
 
 function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true); // Add loading state for initial auth check
+  const [currentUser, setCurrentUser] = useState(null);
 
   useEffect(() => {
-    // Check authentication state on mount
-    // Use sessionStorage instead of localStorage for browser closure logout
-    const isLoggedIn = sessionStorage.getItem('isLoggedIn') === 'true';
-    const authToken = sessionStorage.getItem('authToken');
+    const checkAuthAndFetchUser = async () => {
+      // Check authentication state on mount
+      const isLoggedIn = sessionStorage.getItem('isLoggedIn') === 'true';
+      const authToken = sessionStorage.getItem('authToken');
+      const storedUser = sessionStorage.getItem('user');
+      
+      if (isLoggedIn && authToken) {
+        try {
+          // First, use stored user data if available
+          if (storedUser) {
+            setCurrentUser(JSON.parse(storedUser));
+          }
+          
+          setIsAuthenticated(true);
+          
+          // Then try to fetch fresh user data from API
+          try {
+            const response = await userAPI.getCurrentUser();
+            if (response.data.success) {
+              setCurrentUser(response.data.data);
+            }
+          } catch (apiError) {
+            console.warn('Could not fetch fresh user data on startup:', apiError);
+            // Keep using stored user data, don't logout unless stored data is also missing
+            if (!storedUser) {
+              handleLogout();
+            }
+          }
+        } catch (error) {
+          console.error('Auth check failed:', error);
+          handleLogout();
+        }
+      } else {
+        setIsAuthenticated(false);
+      }
+      
+      setIsLoading(false);
+    };
     
-    // Only set authenticated if both conditions are met
-    setIsAuthenticated(isLoggedIn && !!authToken);
-    setIsLoading(false);
+    checkAuthAndFetchUser();
   }, []);
 
   const renderPage = () => {
@@ -54,12 +88,35 @@ function App() {
     localStorage.removeItem('user');
     localStorage.removeItem('userEmail'); // legacy cleanup
     setIsAuthenticated(false);
+    setCurrentUser(null);
     setActiveTab('dashboard');
   };
 
   // Provide a function to be called by Login on success.
-  const handleLoginSuccess = () => {
-    setIsAuthenticated(true);
+  const handleLoginSuccess = async () => {
+    try {
+      // First, try to get user data from sessionStorage (set by authService)
+      const storedUser = sessionStorage.getItem('user');
+      if (storedUser) {
+        setCurrentUser(JSON.parse(storedUser));
+      }
+      
+      setIsAuthenticated(true);
+      
+      // Optionally fetch fresh user data from API
+      try {
+        const response = await userAPI.getCurrentUser();
+        if (response.data.success) {
+          setCurrentUser(response.data.data);
+        }
+      } catch (apiError) {
+        console.warn('Could not fetch fresh user data:', apiError);
+        // Keep using stored user data
+      }
+    } catch (error) {
+      console.error('Failed in login success handler:', error);
+      setIsAuthenticated(true); // Still authenticate even if user setup fails
+    }
   };
 
   // Show loading spinner while checking auth
@@ -99,16 +156,19 @@ function App() {
             </h1>
 
             <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                <span className="text-sm text-slate-600 font-medium">Online</span>
-              </div>
-
               <div className="flex items-center space-x-3">
-                {/* You can replace with avatar / user name */}
+                {currentUser && (
+                  <div className="flex items-center space-x-2">
+                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                    <span className="text-sm text-slate-600 font-medium">
+                      Hi, {currentUser.fullName || currentUser.username}
+                    </span>
+                  </div>
+                )}
+                
                 <button
                   onClick={handleLogout}
-                  className="px-3 py-1 rounded-md bg-slate-100 hover:bg-slate-200 text-sm"
+                  className="px-3 py-1 rounded-md bg-slate-100 hover:bg-slate-200 text-sm font-medium transition-colors"
                 >
                   Logout
                 </button>
