@@ -57,7 +57,7 @@ Run `npm run seed-users` to create these users:
 ### Backend API Test
 
 ```powershell
-Invoke-WebRequest -Uri "https://16.16.24.8:5000/api/users/login" -Method POST -ContentType "application/json" -Body '{"username":"admin","password":"admin123"}'
+Invoke-WebRequest -Uri "https://16.16.24.8:443/api/users/login" -Method POST -ContentType "application/json" -Body '{"username":"admin","password":"admin123"}'
 ```
 
 ### Frontend Test
