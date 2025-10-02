@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
+const { authenticateToken } = require('../middleware/auth');
 
 // @route   POST /api/users/login
 // @desc    Authenticate user and get token
@@ -65,6 +66,30 @@ router.post('/login', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Server error during login',
+      error: error.message
+    });
+  }
+});
+
+// @route   GET /api/users/me
+// @desc    Get current user profile
+// @access  Private
+router.get('/me', authenticateToken, async (req, res) => {
+  try {
+    res.json({
+      success: true,
+      data: {
+        id: req.user._id,
+        username: req.user.username,
+        fullName: req.user.fullName,
+        role: req.user.role
+      }
+    });
+  } catch (error) {
+    console.error('Get current user error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error getting user profile',
       error: error.message
     });
   }

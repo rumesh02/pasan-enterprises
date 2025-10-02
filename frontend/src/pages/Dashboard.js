@@ -1,12 +1,34 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   ChartBarIcon, 
   CurrencyDollarIcon, 
-  TruckIcon, 
-  ExclamationTriangleIcon 
+  ExclamationTriangleIcon,
+  CalendarDaysIcon
 } from '@heroicons/react/24/outline';
 
 const Dashboard = () => {
+  const [yearlyData, setYearlyData] = useState([]);
+  
+  // Sample yearly data for the bar graph
+  useEffect(() => {
+    // Simulate fetching yearly data - you can replace this with actual API calls
+    const monthlyOrdersData = [
+      { month: 'Jan', orders: 45, revenue: 125000 },
+      { month: 'Feb', orders: 52, revenue: 148000 },
+      { month: 'Mar', orders: 61, revenue: 167000 },
+      { month: 'Apr', orders: 48, revenue: 134000 },
+      { month: 'May', orders: 71, revenue: 192000 },
+      { month: 'Jun', orders: 66, revenue: 178000 },
+      { month: 'Jul', orders: 58, revenue: 156000 },
+      { month: 'Aug', orders: 73, revenue: 201000 },
+      { month: 'Sep', orders: 69, revenue: 189000 },
+      { month: 'Oct', orders: 84, revenue: 235000 },
+      { month: 'Nov', orders: 0, revenue: 0 },
+      { month: 'Dec', orders: 0, revenue: 0 }
+    ];
+    setYearlyData(monthlyOrdersData);
+  }, []);
+
   const stats = [
     {
       title: 'Total Inventory Value',
@@ -25,12 +47,12 @@ const Dashboard = () => {
       gradient: 'from-blue-500 to-blue-600'
     },
     {
-      title: 'Pending Orders',
-      value: '23',
-      change: '-5.1%',
-      changeType: 'negative',
-      icon: TruckIcon,
-      gradient: 'from-orange-500 to-orange-600'
+      title: 'This Month Orders',
+      value: '84',
+      change: '+21.7%',
+      changeType: 'positive',
+      icon: CalendarDaysIcon,
+      gradient: 'from-purple-500 to-purple-600'
     },
     {
       title: 'Low Stock Items',
@@ -41,6 +63,9 @@ const Dashboard = () => {
       gradient: 'from-red-500 to-red-600'
     }
   ];
+
+  // Get the maximum value for scaling the bar chart
+  const maxOrders = Math.max(...yearlyData.map(item => item.orders));
 
   return (
     <div className="p-8">
@@ -77,49 +102,113 @@ const Dashboard = () => {
       </div>
 
       {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Activity */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        {/* This Month Orders Details */}
         <div className="bg-white/60 backdrop-blur-sm rounded-2xl shadow-xl border border-slate-200/50 p-6">
-          <h3 className="text-xl font-bold text-slate-800 mb-4">Recent Activity</h3>
+          <h3 className="text-xl font-bold text-slate-800 mb-4 flex items-center">
+            <CalendarDaysIcon className="w-6 h-6 mr-2 text-purple-600" />
+            This Month Orders
+          </h3>
           <div className="space-y-4">
-            {[
-              { action: 'New item added', item: 'Hydraulic Pump HP-2000', time: '2 hours ago', type: 'add' },
-              { action: 'Item sold', item: 'Industrial Motor IM-500', time: '4 hours ago', type: 'sell' },
-              { action: 'Stock updated', item: 'Steel Pipes SP-100', time: '6 hours ago', type: 'update' },
-              { action: 'Low stock alert', item: 'Bearing Set BS-250', time: '8 hours ago', type: 'alert' }
-            ].map((activity, index) => (
-              <div key={index} className="flex items-center space-x-4 p-3 rounded-lg hover:bg-slate-50 transition-colors">
-                <div className={`w-3 h-3 rounded-full ${
-                  activity.type === 'add' ? 'bg-green-500' :
-                  activity.type === 'sell' ? 'bg-blue-500' :
-                  activity.type === 'update' ? 'bg-orange-500' :
-                  'bg-red-500'
-                }`}></div>
-                <div className="flex-1">
-                  <p className="text-slate-800 font-medium">{activity.action}</p>
-                  <p className="text-slate-600 text-sm">{activity.item}</p>
-                </div>
-                <span className="text-slate-500 text-sm">{activity.time}</span>
+            <div className="bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg p-4">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm font-medium text-purple-700">Total Orders</span>
+                <span className="text-2xl font-bold text-purple-800">84</span>
               </div>
-            ))}
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm font-medium text-purple-700">Revenue</span>
+                <span className="text-lg font-semibold text-purple-800">Rs. 2,35,000</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium text-purple-700">Growth</span>
+                <span className="text-sm font-bold text-green-600">+21.7% ↗</span>
+              </div>
+            </div>
+            
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-slate-600">Completed</span>
+                <div className="flex items-center">
+                  <div className="w-20 bg-slate-200 rounded-full h-2 mr-2">
+                    <div className="bg-green-500 h-2 rounded-full" style={{width: '95%'}}></div>
+                  </div>
+                  <span className="text-sm font-medium">80</span>
+                </div>
+              </div>
+              
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-slate-600">Processing</span>
+                <div className="flex items-center">
+                  <div className="w-20 bg-slate-200 rounded-full h-2 mr-2">
+                    <div className="bg-orange-500 h-2 rounded-full" style={{width: '5%'}}></div>
+                  </div>
+                  <span className="text-sm font-medium">4</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Quick Actions */}
-        <div className="bg-white/60 backdrop-blur-sm rounded-2xl shadow-xl border border-slate-200/50 p-6">
-          <h3 className="text-xl font-bold text-slate-800 mb-4">Quick Actions</h3>
-          <div className="grid grid-cols-2 gap-4">
-            {[
-              { title: 'Add New Item', icon: '➕', color: 'from-green-500 to-green-600' },
-              { title: 'Process Sale', icon: '🛒', color: 'from-blue-500 to-blue-600' },
-              { title: 'Update Stock', icon: '📦', color: 'from-orange-500 to-orange-600' },
-              { title: 'Generate Report', icon: '📊', color: 'from-purple-500 to-purple-600' }
-            ].map((action, index) => (
-              <button key={index} className={`p-4 rounded-xl bg-gradient-to-r ${action.color} text-white hover:scale-105 transition-all duration-200 shadow-lg`}>
-                <div className="text-2xl mb-2">{action.icon}</div>
-                <div className="text-sm font-medium">{action.title}</div>
-              </button>
-            ))}
+        {/* Yearly Bar Graph */}
+        <div className="lg:col-span-2 bg-white/60 backdrop-blur-sm rounded-2xl shadow-xl border border-slate-200/50 p-6">
+          <h3 className="text-xl font-bold text-slate-800 mb-6 flex items-center">
+            <ChartBarIcon className="w-6 h-6 mr-2 text-blue-600" />
+            Monthly Orders Overview (2025)
+          </h3>
+          
+          <div className="space-y-4">
+            {/* Legend */}
+            <div className="flex items-center space-x-6 text-sm">
+              <div className="flex items-center">
+                <div className="w-4 h-4 bg-gradient-to-r from-blue-500 to-blue-600 rounded mr-2"></div>
+                <span className="text-slate-600">Orders</span>
+              </div>
+              <div className="flex items-center">
+                <div className="w-4 h-4 bg-gradient-to-r from-green-500 to-green-600 rounded mr-2"></div>
+                <span className="text-slate-600">Revenue (in thousands)</span>
+              </div>
+            </div>
+
+            {/* Bar Chart */}
+            <div className="flex items-end justify-between h-48 bg-gradient-to-t from-slate-50 to-transparent rounded-lg p-4 border">
+              {yearlyData.map((data, index) => {
+                const orderHeight = maxOrders > 0 ? (data.orders / maxOrders) * 100 : 0;
+                const revenueHeight = data.revenue > 0 ? (data.revenue / 250000) * 100 : 0;
+                
+                return (
+                  <div key={index} className="flex flex-col items-center space-y-2 flex-1">
+                    {/* Revenue Bar (Background) */}
+                    <div className="relative w-6 bg-slate-200 rounded-t">
+                      <div 
+                        className="bg-gradient-to-t from-green-500 to-green-400 rounded-t transition-all duration-1000 ease-out"
+                        style={{ height: `${Math.max(revenueHeight, 5)}%` }}
+                      ></div>
+                    </div>
+                    
+                    {/* Orders Bar (Foreground) */}
+                    <div className="relative w-4 bg-slate-200 rounded-t -mt-2">
+                      <div 
+                        className="bg-gradient-to-t from-blue-500 to-blue-400 rounded-t transition-all duration-1000 ease-out"
+                        style={{ height: `${Math.max(orderHeight, 5)}%` }}
+                      ></div>
+                    </div>
+                    
+                    {/* Values */}
+                    <div className="text-center">
+                      <div className="text-xs font-bold text-slate-800">{data.orders}</div>
+                      <div className="text-xs text-slate-500">{data.month}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            
+            {/* Y-axis labels */}
+            <div className="flex justify-between text-xs text-slate-500 mt-2">
+              <span>0</span>
+              <span className="text-blue-600">Orders: {maxOrders}</span>
+              <span className="text-green-600">Revenue: Rs. 2.5L</span>
+            </div>
           </div>
         </div>
       </div>
