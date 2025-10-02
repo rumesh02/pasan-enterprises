@@ -1,9 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const fs = require('fs');
-const https = require('https');
 require('dotenv').config();
-const path = require('path');
 
 // Import database connection
 const connectDB = require('./db');
@@ -25,7 +22,7 @@ connectDB();
 // Basic route
 app.get('/', (req, res) => {
   res.json({ 
-    message: '🚀 Pasan Enterprises API Server is running with HTTPS!',
+    message: '🚀 Pasan Enterprises API Server is running!',
     status: 'Active',
     timestamp: new Date().toISOString()
   });
@@ -67,17 +64,11 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Load SSL cert and key
-const sslOptions = {
-  key: fs.readFileSync(path.join('/home/ubuntu/certs/server.key')),
-  cert: fs.readFileSync(path.join('/home/ubuntu/certs/server.crt'))
-};
-
-// Start HTTPS server
-https.createServer(sslOptions, app).listen(PORT, '0.0.0.0', () => {
-  console.log(`✅ HTTPS Server running on port ${PORT}`);
-  console.log(`🌐 API available at: https://<EC2_PUBLIC_IP>:${PORT}`);
-  console.log(`📚 Health check: https://<EC2_PUBLIC_IP>:${PORT}/health`);
+// Start HTTP server (plain, Nginx will handle HTTPS)
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`✅ Node server running on port ${PORT}`);
+  console.log(`🌐 API available at http://localhost:${PORT}`);
+  console.log(`📚 Health check: http://localhost:${PORT}/health`);
 });
 
 module.exports = app;
