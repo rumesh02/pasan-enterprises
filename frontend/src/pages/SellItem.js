@@ -11,7 +11,7 @@ import {
   ReceiptPercentIcon,
   DocumentArrowDownIcon
 } from '@heroicons/react/24/outline';
-import { machineAPI, salesAPI, handleApiError } from '../services/apiService';
+import { machineAPI, salesAPI, customerAPI, handleApiError } from '../services/apiService';
 import { generateInvoice } from '../services/invoiceService';
 
 const SellItem = () => {
@@ -28,6 +28,9 @@ const SellItem = () => {
     nic: '',
     address: ''
   });
+  const [customerSearchResults, setCustomerSearchResults] = useState([]);
+  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
+  const [customerSearchLoading, setCustomerSearchLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState('');
@@ -86,6 +89,15 @@ const SellItem = () => {
     fetchMachines();
   }, [fetchMachines]);
 
+  // Cleanup timeout on component unmount
+  useEffect(() => {
+    return () => {
+      if (window.customerSearchTimeout) {
+        clearTimeout(window.customerSearchTimeout);
+      }
+    };
+  }, []);
+
   const fetchCategories = async () => {
     try {
       const response = await machineAPI.getCategories();
@@ -95,6 +107,63 @@ const SellItem = () => {
     } catch (err) {
       console.error('Error fetching categories:', err);
     }
+  };
+
+  // Customer search function
+  const searchCustomers = async (searchTerm) => {
+    if (!searchTerm.trim()) {
+      setCustomerSearchResults([]);
+      setShowCustomerDropdown(false);
+      return;
+    }
+
+    try {
+      setCustomerSearchLoading(true);
+      const response = await customerAPI.getAll({
+        search: searchTerm.trim(),
+        limit: 10 // Limit results for dropdown
+      });
+      
+      if (response.data.success) {
+        setCustomerSearchResults(response.data.data);
+        setShowCustomerDropdown(true);
+      }
+    } catch (err) {
+      console.error('Error searching customers:', err);
+      setCustomerSearchResults([]);
+    } finally {
+      setCustomerSearchLoading(false);
+    }
+  };
+
+  // Handle customer name input change
+  const handleCustomerNameChange = (value) => {
+    setCustomerInfo({...customerInfo, name: value});
+    
+    // If input is cleared, hide dropdown immediately
+    if (!value.trim()) {
+      setCustomerSearchResults([]);
+      setShowCustomerDropdown(false);
+      return;
+    }
+    
+    // Debounce the search to avoid too many API calls
+    clearTimeout(window.customerSearchTimeout);
+    window.customerSearchTimeout = setTimeout(() => {
+      searchCustomers(value);
+    }, 300);
+  };
+
+  // Handle customer selection from dropdown
+  const handleCustomerSelect = (customer) => {
+    setCustomerInfo({
+      name: customer.name,
+      email: customer.email || '',
+      phone: customer.phone || '',
+      nic: customer.nic || ''
+    });
+    setShowCustomerDropdown(false);
+    setCustomerSearchResults([]);
   };
 
   // Pagination functions
@@ -478,6 +547,9 @@ const SellItem = () => {
         setCart([]);
         setExtras([]);
         setCustomerInfo({ name: '', email: '', phone: '', nic: '', address: '' });
+        setCustomerSearchResults([]);
+        setShowCustomerDropdown(false);
+
         setDiscountPercentage(0);
         
         // Refresh machines to get updated stock
@@ -895,16 +967,75 @@ const SellItem = () => {
         <h3 className="text-xl font-bold text-slate-800 mb-6">Customer Information & Complete Sale</h3>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <div>
+          <div className="relative">
             <label className="block text-sm font-medium text-slate-700 mb-2">Customer Name *</label>
             <input
               type="text"
               placeholder="Enter customer name"
               value={customerInfo.name}
-              onChange={(e) => setCustomerInfo({...customerInfo, name: e.target.value})}
+              onChange={(e) => handleCustomerNameChange(e.target.value)}
+              onFocus={() => {
+                if (customerInfo.name.trim()) {
+                  searchCustomers(customerInfo.name);
+                }
+              }}
+              onBlur={(e) => {
+                // Only hide dropdown if not clicking on dropdown items
+                const relatedTarget = e.relatedTarget;
+                if (!relatedTarget || !relatedTarget.closest('.customer-dropdown')) {
+                  setTimeout(() => setShowCustomerDropdown(false), 150);
+                }
+              }}
               className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/50"
               required
+              autoComplete="off"
             />
+            
+            {/* Customer Search Dropdown */}
+            {showCustomerDropdown && (
+              <div className="customer-dropdown absolute z-50 w-full mt-1 bg-white border border-slate-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                {customerSearchLoading ? (
+                  <div className="px-4 py-3 text-center text-slate-500">
+                    <div className="animate-spin inline-block w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full mr-2"></div>
+                    Searching customers...
+                  </div>
+                ) : customerSearchResults && customerSearchResults.length > 0 ? (
+                  customerSearchResults.map((customer) => (
+                    <div
+                      key={customer._id}
+                      className="px-4 py-3 hover:bg-slate-50 cursor-pointer border-b border-slate-100 last:border-b-0"
+                      onClick={() => handleCustomerSelect(customer)}
+                      onMouseDown={(e) => e.preventDefault()} // Prevent input blur
+                    >
+                      <div className="font-medium text-slate-800">{customer.name}</div>
+                      <div className="text-sm text-slate-500">
+                        {customer.phone}
+                        {customer.email && ` • ${customer.email}`}
+                      </div>
+                    </div>
+                  ))
+                ) : customerInfo.name.trim() && (
+                  <div>
+                    <div className="px-4 py-3 text-center text-slate-500">
+                      No customers found matching "{customerInfo.name}"
+                    </div>
+                    <div 
+                      className="px-4 py-3 hover:bg-blue-50 cursor-pointer border-t border-slate-200 text-blue-600 font-medium"
+                      onClick={() => {
+                        // Keep the current name and hide dropdown, user can fill other fields manually
+                        setShowCustomerDropdown(false);
+                      }}
+                      onMouseDown={(e) => e.preventDefault()}
+                    >
+                      <div className="flex items-center">
+                        <PlusIcon className="w-4 h-4 mr-2" />
+                        Continue with "{customerInfo.name}" as new customer
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           
           <div>
