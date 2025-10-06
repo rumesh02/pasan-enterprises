@@ -20,3 +20,13 @@ body {
 .animation-delay-4000 {
   animation-delay: 4s;
 }
+
+/* Fast spinning animation for loading spinners */
+@keyframes spin-fast {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.animate-spin-fast {
+  animation: spin-fast 0.5s linear infinite;
+}
