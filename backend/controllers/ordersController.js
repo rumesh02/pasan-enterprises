@@ -1,4 +1,5 @@
 const PastOrder = require('../models/PastOrder');
+const Machine = require('../models/Machine');
 
 // @desc    Get all past orders
 // @route   GET /api/past-orders
@@ -369,6 +370,247 @@ const deleteOrder = async (req, res) => {
   }
 };
 
+// @desc    Return an item from an order
+// @route   PUT /api/past-orders/return-item/:orderId
+// @access  Public
+const returnItem = async (req, res) => {
+  try {
+    const { machineId, returnQuantity } = req.body;
+    const { orderId } = req.params;
+
+    // Validate request body
+    if (!machineId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Machine ID is required'
+      });
+    }
+
+    if (!returnQuantity || returnQuantity < 1) {
+      return res.status(400).json({
+        success: false,
+        message: 'Return quantity must be at least 1'
+      });
+    }
+
+    // Find the order
+    const order = await PastOrder.findById(orderId);
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found'
+      });
+    }
+
+    // Find the item in the order
+    const itemIndex = order.items.findIndex(
+      item => item.machineId.toString() === machineId.toString()
+    );
+
+    if (itemIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        message: 'Item not found in this order'
+      });
+    }
+
+    // Get the item details
+    const returnedItem = order.items[itemIndex];
+    
+    // Calculate available quantity to return
+    const currentReturnedQty = returnedItem.returnedQuantity || 0;
+    const availableToReturn = returnedItem.quantity - currentReturnedQty;
+
+    // Validate return quantity
+    if (returnQuantity > availableToReturn) {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot return ${returnQuantity} units. Only ${availableToReturn} units available to return.`
+      });
+    }
+
+    // Update returned quantity
+    const newReturnedQuantity = currentReturnedQty + returnQuantity;
+    order.items[itemIndex].returnedQuantity = newReturnedQuantity;
+    
+    // Mark as fully returned if all units are returned
+    if (newReturnedQuantity >= returnedItem.quantity) {
+      order.items[itemIndex].returned = true;
+    }
+    
+    // Set returnedAt timestamp on first return
+    if (!order.items[itemIndex].returnedAt) {
+      order.items[itemIndex].returnedAt = new Date();
+    }
+
+    // Save the order (this will trigger pre-save middleware to recalculate totals)
+    await order.save();
+
+    // Update the machine stock - increase quantity
+    const machine = await Machine.findById(machineId);
+
+    if (!machine) {
+      // Rollback the order change if machine not found
+      order.items[itemIndex].returnedQuantity = currentReturnedQty;
+      order.items[itemIndex].returned = false;
+      order.items[itemIndex].returnedAt = undefined;
+      await order.save();
+      
+      return res.status(404).json({
+        success: false,
+        message: 'Machine not found in inventory'
+      });
+    }
+
+    // Increase machine stock by the returned quantity
+    machine.quantity += returnQuantity;
+    await machine.save();
+
+    console.log(`✅ Item returned: ${returnedItem.name} (Qty: ${returnQuantity} of ${returnedItem.quantity})`);
+    console.log(`📦 Machine stock updated: ${machine.name} - New quantity: ${machine.quantity}`);
+
+    // Fetch updated order with populated data
+    const updatedOrder = await PastOrder.findById(orderId)
+      .populate('customerId', 'name phone email')
+      .populate('items.machineId', 'itemId name category');
+
+    res.json({
+      success: true,
+      message: 'Item returned successfully',
+      data: {
+        order: updatedOrder,
+        returnedItem: {
+          name: returnedItem.name,
+          quantity: returnedItem.quantity,
+          refundAmount: returnedItem.totalWithVAT || returnedItem.subtotal
+        },
+        updatedStock: {
+          machineName: machine.name,
+          newQuantity: machine.quantity
+        }
+      }
+    });
+  } catch (error) {
+    console.error('❌ Error returning item:', error);
+    
+    if (error.kind === 'ObjectId') {
+      return res.status(404).json({
+        success: false,
+        message: 'Invalid order or machine ID'
+      });
+    }
+    
+    res.status(500).json({
+      success: false,
+      message: 'Server Error',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Update/Edit an order
+// @route   PUT /api/past-orders/:orderId
+// @access  Public
+const updateOrder = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const updateData = req.body;
+
+    // Find the order
+    const order = await PastOrder.findById(orderId);
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found'
+      });
+    }
+
+    // Update customer info if provided
+    if (updateData.customerInfo) {
+      order.customerInfo = {
+        ...order.customerInfo,
+        ...updateData.customerInfo
+      };
+    }
+
+    // Update items if provided
+    if (updateData.items) {
+      order.items = updateData.items;
+    }
+
+    // Update extras if provided
+    if (updateData.extras !== undefined) {
+      order.extras = updateData.extras;
+    }
+
+    // Update discount if provided
+    if (updateData.discountPercentage !== undefined) {
+      order.discountPercentage = updateData.discountPercentage;
+    }
+
+    // Update status fields if provided
+    if (updateData.orderStatus) {
+      order.orderStatus = updateData.orderStatus;
+    }
+
+    if (updateData.paymentStatus) {
+      order.paymentStatus = updateData.paymentStatus;
+    }
+
+    // Update notes if provided
+    if (updateData.notes !== undefined) {
+      order.notes = updateData.notes;
+    }
+
+    // Update processed by if provided
+    if (updateData.processedBy) {
+      order.processedBy = updateData.processedBy;
+    }
+
+    // Save the order (pre-save middleware will recalculate totals)
+    await order.save();
+
+    console.log(`✅ Order updated: ${order.orderId}`);
+
+    // Fetch updated order with populated data
+    const updatedOrder = await PastOrder.findById(orderId)
+      .populate('customerId', 'name phone email')
+      .populate('items.machineId', 'itemId name category');
+
+    res.json({
+      success: true,
+      message: 'Order updated successfully',
+      data: updatedOrder
+    });
+  } catch (error) {
+    console.error('❌ Error updating order:', error);
+    
+    if (error.kind === 'ObjectId') {
+      return res.status(404).json({
+        success: false,
+        message: 'Invalid order ID'
+      });
+    }
+
+    if (error.name === 'ValidationError') {
+      const errors = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({
+        success: false,
+        message: 'Validation Error',
+        errors
+      });
+    }
+    
+    res.status(500).json({
+      success: false,
+      message: 'Server Error',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   getAllOrders,
   getOrderById,
@@ -376,5 +618,7 @@ module.exports = {
   updateOrderStatus,
   getOrderStats,
   getOrdersByDateRange,
-  deleteOrder
+  deleteOrder,
+  returnItem,
+  updateOrder
 };

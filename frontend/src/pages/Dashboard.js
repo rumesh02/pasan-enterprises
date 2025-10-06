@@ -1,71 +1,199 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   ChartBarIcon, 
   CurrencyDollarIcon, 
   ExclamationTriangleIcon,
-  CalendarDaysIcon
+  ShoppingCartIcon
 } from '@heroicons/react/24/outline';
+import { pastOrdersAPI, machineAPI } from '../services/apiService';
 
 const Dashboard = () => {
-  const [yearlyData, setYearlyData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   
-  // Sample yearly data for the bar graph
-  useEffect(() => {
-    // Simulate fetching yearly data - you can replace this with actual API calls
-    const monthlyOrdersData = [
-      { month: 'Jan', orders: 45, revenue: 125000 },
-      { month: 'Feb', orders: 52, revenue: 148000 },
-      { month: 'Mar', orders: 61, revenue: 167000 },
-      { month: 'Apr', orders: 48, revenue: 134000 },
-      { month: 'May', orders: 71, revenue: 192000 },
-      { month: 'Jun', orders: 66, revenue: 178000 },
-      { month: 'Jul', orders: 58, revenue: 156000 },
-      { month: 'Aug', orders: 73, revenue: 201000 },
-      { month: 'Sep', orders: 69, revenue: 189000 },
-      { month: 'Oct', orders: 84, revenue: 235000 },
-      { month: 'Nov', orders: 0, revenue: 0 },
-      { month: 'Dec', orders: 0, revenue: 0 }
+  // State for data
+  const [pastOrders, setPastOrders] = useState([]);
+  const [machines, setMachines] = useState([]);
+  
+  // State for calculated stats
+  const [totalOrders, setTotalOrders] = useState(0);
+  const [lowStockCount, setLowStockCount] = useState(0);
+  const [monthlyRevenue, setMonthlyRevenue] = useState(0);
+  const [totalItems, setTotalItems] = useState(0);
+  const [monthlyOrders, setMonthlyOrders] = useState([]);
+
+  // Calculate monthly order data for bar chart
+  const calculateMonthlyData = useCallback((ordersData) => {
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
     ];
-    setYearlyData(monthlyOrdersData);
+    
+    const currentYear = new Date().getFullYear();
+    
+    // Initialize monthly data
+    const monthlyStats = months.map((month, index) => ({
+      month,
+      monthIndex: index,
+      revenue: 0,
+      orders: 0
+    }));
+    
+    // Group orders by month
+    ordersData.forEach(order => {
+      const orderDate = new Date(order.createdAt);
+      if (orderDate.getFullYear() === currentYear) {
+        const monthIndex = orderDate.getMonth();
+        monthlyStats[monthIndex].revenue += (order.finalTotal || order.total || 0);
+        monthlyStats[monthIndex].orders += 1;
+      }
+    });
+    
+    console.log('📊 Monthly Data Calculated:', monthlyStats);
+    console.log('📅 Current Year:', currentYear);
+    console.log('📦 Total Orders Processed:', ordersData.length);
+    
+    return monthlyStats;
   }, []);
 
+  // Calculate all statistics
+  const calculateStats = useCallback((ordersData, machinesData) => {
+    // 1. Total Orders: Sum all order prices
+    const total = ordersData.reduce((sum, order) => sum + (order.finalTotal || order.total || 0), 0);
+    setTotalOrders(total);
+    
+    // 2. Low Stock Count: Count machines with quantity < 3
+    const lowStock = machinesData.filter(machine => machine.quantity < 3).length;
+    setLowStockCount(lowStock);
+    
+    // 3. Monthly Revenue: Filter orders by current month and sum prices
+    const currentDate = new Date();
+    const currentMonth = currentDate.getMonth();
+    const currentYear = currentDate.getFullYear();
+    
+    const monthRevenue = ordersData
+      .filter(order => {
+        const orderDate = new Date(order.createdAt);
+        return orderDate.getMonth() === currentMonth && orderDate.getFullYear() === currentYear;
+      })
+      .reduce((sum, order) => sum + (order.finalTotal || order.total || 0), 0);
+    
+    setMonthlyRevenue(monthRevenue);
+    
+    // 4. Total Items: Total number of machines
+    setTotalItems(machinesData.length);
+    
+    // 5. Monthly Orders: Group orders by month and calculate totals
+    const monthlyData = calculateMonthlyData(ordersData);
+    setMonthlyOrders(monthlyData);
+  }, [calculateMonthlyData]);
+
+  // Fetch data from backend
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        setError('');
+        
+        // Fetch past orders and machines in parallel
+        const [ordersResponse, machinesResponse] = await Promise.all([
+          pastOrdersAPI.getAll(),
+          machineAPI.getAll()
+        ]);
+        
+        console.log('Orders Response:', ordersResponse.data);
+        console.log('Machines Response:', machinesResponse.data);
+        
+        // Extract data
+        const ordersData = ordersResponse.data?.data || [];
+        const machinesData = machinesResponse.data?.data || [];
+        
+        console.log('📦 Extracted Orders:', ordersData.length, 'orders');
+        console.log('🔧 Extracted Machines:', machinesData.length, 'machines');
+        console.log('📋 Sample Order:', ordersData[0]);
+        
+        setPastOrders(ordersData);
+        setMachines(machinesData);
+        
+        // Perform calculations
+        calculateStats(ordersData, machinesData);
+        
+      } catch (err) {
+        console.error('Error fetching dashboard data:', err);
+        setError('Failed to load dashboard data');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchData();
+  }, [calculateStats]);
+
+  // Format currency
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-LK', {
+      style: 'currency',
+      currency: 'LKR',
+      minimumFractionDigits: 0,
+    }).format(amount);
+  };
+
+  // Stats configuration
   const stats = [
     {
-      title: 'Total Inventory Value',
-      value: 'Rs. 2,450,000',
-      change: '+12.5%',
-      changeType: 'positive',
+      title: 'Monthly Revenue',
+      value: formatCurrency(monthlyRevenue),
       icon: CurrencyDollarIcon,
-      gradient: 'from-green-500 to-green-600'
+      gradient: 'from-green-500 to-green-600',
+      description: 'This month'
     },
     {
-      title: 'Total Items',
-      value: '1,247',
-      change: '+8.2%',
-      changeType: 'positive',
-      icon: ChartBarIcon,
-      gradient: 'from-blue-500 to-blue-600'
-    },
-    {
-      title: 'This Month Orders',
-      value: '84',
-      change: '+21.7%',
-      changeType: 'positive',
-      icon: CalendarDaysIcon,
-      gradient: 'from-purple-500 to-purple-600'
+      title: 'Total Orders',
+      value: formatCurrency(totalOrders),
+      icon: ShoppingCartIcon,
+      gradient: 'from-blue-500 to-blue-600',
+      description: 'All time revenue'
     },
     {
       title: 'Low Stock Items',
-      value: '8',
-      change: '+2',
-      changeType: 'warning',
+      value: lowStockCount,
       icon: ExclamationTriangleIcon,
-      gradient: 'from-red-500 to-red-600'
+      gradient: 'from-red-500 to-red-600',
+      description: 'Items with qty < 3'
+    },
+    {
+      title: 'Total Items',
+      value: totalItems,
+      icon: ChartBarIcon,
+      gradient: 'from-purple-500 to-purple-600',
+      description: 'In inventory'
     }
   ];
 
-  // Get the maximum value for scaling the bar chart
-  const maxOrders = Math.max(...yearlyData.map(item => item.orders));
+  // Custom tooltip for bar chart
+  const [hoveredMonth, setHoveredMonth] = useState(null);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-slate-600 text-lg">Loading dashboard data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <ExclamationTriangleIcon className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <p className="text-red-600 text-lg">{error}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-8">
@@ -86,128 +214,134 @@ const Dashboard = () => {
                 <div className={`p-3 rounded-xl bg-gradient-to-r ${stat.gradient} shadow-lg`}>
                   <IconComponent className="w-6 h-6 text-white" />
                 </div>
-                <span className={`text-sm font-medium px-3 py-1 rounded-full ${
-                  stat.changeType === 'positive' ? 'text-green-700 bg-green-100' :
-                  stat.changeType === 'negative' ? 'text-red-700 bg-red-100' :
-                  'text-orange-700 bg-orange-100'
-                }`}>
-                  {stat.change}
-                </span>
               </div>
               <h3 className="text-2xl font-bold text-slate-800 mb-2">{stat.value}</h3>
-              <p className="text-slate-600 text-sm">{stat.title}</p>
+              <p className="text-slate-600 text-sm font-medium">{stat.title}</p>
+              <p className="text-slate-500 text-xs mt-1">{stat.description}</p>
             </div>
           );
         })}
       </div>
 
-      {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-        {/* This Month Orders Details */}
-        <div className="bg-white/60 backdrop-blur-sm rounded-2xl shadow-xl border border-slate-200/50 p-6">
-          <h3 className="text-xl font-bold text-slate-800 mb-4 flex items-center">
-            <CalendarDaysIcon className="w-6 h-6 mr-2 text-purple-600" />
-            This Month Orders
-          </h3>
-          <div className="space-y-4">
-            <div className="bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg p-4">
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-sm font-medium text-purple-700">Total Orders</span>
-                <span className="text-2xl font-bold text-purple-800">84</span>
-              </div>
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-sm font-medium text-purple-700">Revenue</span>
-                <span className="text-lg font-semibold text-purple-800">Rs. 2,35,000</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-medium text-purple-700">Growth</span>
-                <span className="text-sm font-bold text-green-600">+21.7% ↗</span>
-              </div>
-            </div>
-            
-            <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-slate-600">Completed</span>
-                <div className="flex items-center">
-                  <div className="w-20 bg-slate-200 rounded-full h-2 mr-2">
-                    <div className="bg-green-500 h-2 rounded-full" style={{width: '95%'}}></div>
-                  </div>
-                  <span className="text-sm font-medium">80</span>
-                </div>
-              </div>
-              
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-slate-600">Processing</span>
-                <div className="flex items-center">
-                  <div className="w-20 bg-slate-200 rounded-full h-2 mr-2">
-                    <div className="bg-orange-500 h-2 rounded-full" style={{width: '5%'}}></div>
-                  </div>
-                  <span className="text-sm font-medium">4</span>
-                </div>
-              </div>
+      {/* Monthly Revenue Chart */}
+      <div className="bg-white/60 backdrop-blur-sm rounded-2xl shadow-xl border border-slate-200/50 p-6">
+        <h3 className="text-xl font-bold text-slate-800 mb-6 flex items-center">
+          <ChartBarIcon className="w-6 h-6 mr-2 text-blue-600" />
+          Monthly Revenue Overview ({new Date().getFullYear()})
+        </h3>
+        
+        {/* Custom Bar Chart */}
+        <div className="space-y-4">
+          {/* Legend */}
+          <div className="flex items-center justify-center space-x-6 text-sm mb-4">
+            <div className="flex items-center">
+              <div className="w-4 h-4 bg-gradient-to-r from-blue-500 to-blue-600 rounded mr-2"></div>
+              <span className="text-slate-600">Monthly Revenue</span>
             </div>
           </div>
-        </div>
 
-        {/* Yearly Bar Graph */}
-        <div className="lg:col-span-2 bg-white/60 backdrop-blur-sm rounded-2xl shadow-xl border border-slate-200/50 p-6">
-          <h3 className="text-xl font-bold text-slate-800 mb-6 flex items-center">
-            <ChartBarIcon className="w-6 h-6 mr-2 text-blue-600" />
-            Monthly Orders Overview (2025)
-          </h3>
-          
-          <div className="space-y-4">
-            {/* Legend */}
-            <div className="flex items-center space-x-6 text-sm">
-              <div className="flex items-center">
-                <div className="w-4 h-4 bg-gradient-to-r from-blue-500 to-blue-600 rounded mr-2"></div>
-                <span className="text-slate-600">Orders</span>
-              </div>
-              <div className="flex items-center">
-                <div className="w-4 h-4 bg-gradient-to-r from-green-500 to-green-600 rounded mr-2"></div>
-                <span className="text-slate-600">Revenue (in thousands)</span>
-              </div>
+          {/* Bar Chart Container */}
+          <div className="relative bg-gradient-to-t from-slate-50 to-transparent rounded-lg p-6 border border-slate-200">
+            {/* Y-axis labels */}
+            <div className="absolute left-0 top-0 h-full flex flex-col justify-between text-xs text-slate-500 pr-2 pt-4 pb-12">
+              {(() => {
+                const maxRevenue = Math.max(...monthlyOrders.map(m => m.revenue), 100000);
+                return (
+                  <>
+                    <span>{formatCurrency(maxRevenue)}</span>
+                    <span>{formatCurrency(maxRevenue * 0.75)}</span>
+                    <span>{formatCurrency(maxRevenue * 0.5)}</span>
+                    <span>{formatCurrency(maxRevenue * 0.25)}</span>
+                    <span>Rs. 0</span>
+                  </>
+                );
+              })()}
             </div>
 
-            {/* Bar Chart */}
-            <div className="flex items-end justify-between h-48 bg-gradient-to-t from-slate-50 to-transparent rounded-lg p-4 border">
-              {yearlyData.map((data, index) => {
-                const orderHeight = maxOrders > 0 ? (data.orders / maxOrders) * 100 : 0;
-                const revenueHeight = data.revenue > 0 ? (data.revenue / 250000) * 100 : 0;
+            {/* Bars Container */}
+            <div className="ml-20 flex items-end justify-between h-80 gap-2 pt-4 pb-12">
+              {monthlyOrders.map((data, index) => {
+                const maxRevenue = Math.max(...monthlyOrders.map(m => m.revenue), 1); // At least 1 to avoid division by zero
+                const barHeightPercent = data.revenue > 0 ? (data.revenue / maxRevenue) * 100 : 0;
+                // Ensure minimum visible height for bars with data
+                const displayHeight = data.revenue > 0 ? Math.max(barHeightPercent, 5) : 0;
+                
+                console.log(`${data.month}: Revenue=${data.revenue}, MaxRevenue=${maxRevenue}, Height=${displayHeight}%`);
                 
                 return (
-                  <div key={index} className="flex flex-col items-center space-y-2 flex-1">
-                    {/* Revenue Bar (Background) */}
-                    <div className="relative w-6 bg-slate-200 rounded-t">
-                      <div 
-                        className="bg-gradient-to-t from-green-500 to-green-400 rounded-t transition-all duration-1000 ease-out"
-                        style={{ height: `${Math.max(revenueHeight, 5)}%` }}
-                      ></div>
+                  <div 
+                    key={index} 
+                    className="flex-1 flex flex-col items-center group relative"
+                    onMouseEnter={() => setHoveredMonth(index)}
+                    onMouseLeave={() => setHoveredMonth(null)}
+                  >
+                    {/* Tooltip */}
+                    {hoveredMonth === index && (
+                      <div className="absolute bottom-full mb-2 bg-white p-3 border border-slate-200 rounded-lg shadow-lg z-10 whitespace-nowrap">
+                        <p className="font-semibold text-slate-800 mb-1">{data.month} 2025</p>
+                        <p className="text-sm text-blue-600 font-medium">Revenue: {formatCurrency(data.revenue)}</p>
+                        <p className="text-sm text-slate-600">Orders: {data.orders}</p>
+                      </div>
+                    )}
+
+                    {/* Bar */}
+                    <div className="w-full flex flex-col items-center justify-end h-full min-w-[20px]">
+                      {data.revenue > 0 ? (
+                        <div 
+                          className="w-full bg-gradient-to-t from-blue-500 to-blue-400 rounded-t transition-all duration-500 ease-out hover:from-blue-600 hover:to-blue-500 cursor-pointer shadow-md"
+                          style={{ 
+                            height: `${displayHeight}%`,
+                            minHeight: '8px' // Absolute minimum height
+                          }}
+                        ></div>
+                      ) : (
+                        <div className="w-full h-1 bg-slate-200 rounded"></div>
+                      )}
                     </div>
                     
-                    {/* Orders Bar (Foreground) */}
-                    <div className="relative w-4 bg-slate-200 rounded-t -mt-2">
-                      <div 
-                        className="bg-gradient-to-t from-blue-500 to-blue-400 rounded-t transition-all duration-1000 ease-out"
-                        style={{ height: `${Math.max(orderHeight, 5)}%` }}
-                      ></div>
-                    </div>
-                    
-                    {/* Values */}
-                    <div className="text-center">
-                      <div className="text-xs font-bold text-slate-800">{data.orders}</div>
-                      <div className="text-xs text-slate-500">{data.month}</div>
+                    {/* Month Label */}
+                    <div className="text-center mt-2">
+                      <div className="text-xs font-semibold text-slate-700">{data.month}</div>
+                      <div className={`text-xs font-medium ${data.orders > 0 ? 'text-blue-600' : 'text-slate-400'}`}>
+                        {data.orders > 0 ? data.orders : '-'}
+                      </div>
                     </div>
                   </div>
                 );
               })}
             </div>
+
+            {/* X-axis line */}
+            <div className="ml-20 border-t-2 border-slate-300"></div>
             
-            {/* Y-axis labels */}
-            <div className="flex justify-between text-xs text-slate-500 mt-2">
-              <span>0</span>
-              <span className="text-blue-600">Orders: {maxOrders}</span>
-              <span className="text-green-600">Revenue: Rs. 2.5L</span>
+            {/* Debug Info */}
+            <div className="ml-20 mt-2 text-xs text-slate-500">
+              <p>Total data points: {monthlyOrders.length} | 
+                 Max Revenue: {formatCurrency(Math.max(...monthlyOrders.map(m => m.revenue), 0))} | 
+                 Total Orders: {monthlyOrders.reduce((sum, m) => sum + m.orders, 0)}
+              </p>
+            </div>
+          </div>
+
+          {/* Summary Stats */}
+          <div className="grid grid-cols-3 gap-4 mt-4">
+            <div className="text-center p-3 bg-blue-50 rounded-lg">
+              <p className="text-xs text-slate-600">Total Revenue</p>
+              <p className="text-lg font-bold text-blue-600">
+                {formatCurrency(monthlyOrders.reduce((sum, m) => sum + m.revenue, 0))}
+              </p>
+            </div>
+            <div className="text-center p-3 bg-green-50 rounded-lg">
+              <p className="text-xs text-slate-600">Total Orders</p>
+              <p className="text-lg font-bold text-green-600">
+                {monthlyOrders.reduce((sum, m) => sum + m.orders, 0)}
+              </p>
+            </div>
+            <div className="text-center p-3 bg-purple-50 rounded-lg">
+              <p className="text-xs text-slate-600">Avg per Month</p>
+              <p className="text-lg font-bold text-purple-600">
+                {formatCurrency(monthlyOrders.reduce((sum, m) => sum + m.revenue, 0) / 12)}
+              </p>
             </div>
           </div>
         </div>
