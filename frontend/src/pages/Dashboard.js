@@ -5,7 +5,6 @@ import {
   CalendarDaysIcon,
   UsersIcon,
   CogIcon,
-  TrendingUpIcon,
   ArrowUpIcon,
   ArrowDownIcon
 } from '@heroicons/react/24/outline';
