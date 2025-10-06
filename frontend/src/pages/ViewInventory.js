@@ -12,6 +12,7 @@ import { machineService } from '../services/machineService';
 const ViewInventory = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
+  const [filterStatus, setFilterStatus] = useState('all');
   const [machines, setMachines] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -30,6 +31,7 @@ const ViewInventory = () => {
   });
 
   const categories = ['all', 'Pumps', 'Motors', 'Pipes', 'Bearings', 'Valves', 'Filters', 'Seals', 'Tools', 'Electronics', 'Other'];
+  const statusOptions = ['all', 'in-stock', 'low-stock', 'out-of-stock'];
 
   // Fetch machines from database
   useEffect(() => {
@@ -55,11 +57,41 @@ const ViewInventory = () => {
     }
   };
 
+  const getStatus = (quantity) => {
+    if (quantity === 0) return 'Out of Stock';
+    if (quantity <= 2) return 'Low Stock';
+    return 'In Stock';
+  };
+
+  const getStatusColor = (quantity) => {
+    const status = getStatus(quantity);
+    switch (status) {
+      case 'In Stock': return 'bg-green-100 text-green-800';
+      case 'Low Stock': return 'bg-orange-100 text-orange-800';
+      case 'Out of Stock': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
   const filteredItems = Array.isArray(machines) ? machines.filter(item => {
     const matchesSearch = item.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          item.itemId?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = filterCategory === 'all' || item.category === filterCategory;
-    return matchesSearch && matchesCategory;
+    
+    // Status filtering logic
+    const itemStatus = getStatus(item.quantity);
+    let matchesStatus = false;
+    if (filterStatus === 'all') {
+      matchesStatus = true;
+    } else if (filterStatus === 'in-stock') {
+      matchesStatus = itemStatus === 'In Stock';
+    } else if (filterStatus === 'low-stock') {
+      matchesStatus = itemStatus === 'Low Stock';
+    } else if (filterStatus === 'out-of-stock') {
+      matchesStatus = itemStatus === 'Out of Stock';
+    }
+    
+    return matchesSearch && matchesCategory && matchesStatus;
   }) : [];
 
   // Pagination calculations
@@ -71,7 +103,7 @@ const ViewInventory = () => {
   // Reset to page 1 when search or filter changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, filterCategory]);
+  }, [searchTerm, filterCategory, filterStatus]);
 
   const handlePageChange = (pageNumber) => {
     setCurrentPage(pageNumber);
@@ -85,21 +117,7 @@ const ViewInventory = () => {
     setCurrentPage(prev => Math.min(prev + 1, totalPages));
   };
 
-  const getStatus = (quantity) => {
-    if (quantity === 0) return 'Out of Stock';
-    if (quantity <= 5) return 'Low Stock';
-    return 'In Stock';
-  };
 
-  const getStatusColor = (quantity) => {
-    const status = getStatus(quantity);
-    switch (status) {
-      case 'In Stock': return 'bg-green-100 text-green-800';
-      case 'Low Stock': return 'bg-orange-100 text-orange-800';
-      case 'Out of Stock': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
 
   const handleViewDetails = (machine) => {
     setSelectedMachine(machine);
@@ -195,6 +213,25 @@ const ViewInventory = () => {
               {categories.map(category => (
                 <option key={category} value={category}>
                   {category === 'all' ? 'All Categories' : category}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Status Filter */}
+          <div className="relative">
+            <FunnelIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="pl-10 pr-8 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/50"
+            >
+              {statusOptions.map(status => (
+                <option key={status} value={status}>
+                  {status === 'all' ? 'All Status' : 
+                   status === 'in-stock' ? 'In Stock' :
+                   status === 'low-stock' ? 'Low Stock' :
+                   status === 'out-of-stock' ? 'Out of Stock' : status}
                 </option>
               ))}
             </select>

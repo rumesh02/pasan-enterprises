@@ -9,9 +9,11 @@ import {
   ExclamationTriangleIcon,
   XMarkIcon,
   CalculatorIcon,
-  ReceiptPercentIcon
+  ReceiptPercentIcon,
+  DocumentArrowDownIcon
 } from '@heroicons/react/24/outline';
 import { machineAPI, salesAPI, handleApiError } from '../services/apiService';
+import { generateInvoice } from '../services/invoiceService';
 
 const SellItem = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -199,6 +201,66 @@ const SellItem = () => {
     return getTotalBeforeDiscount() - getDiscountAmount() + getExtrasTotal();
   };
 
+  // Function to generate invoice preview (for testing)
+  const handleGenerateInvoicePreview = async () => {
+    if (cart.length === 0) {
+      setError('Please add items to cart before generating invoice preview.');
+      setTimeout(() => setError(''), 3000);
+      return;
+    }
+
+    if (!customerInfo.name?.trim()) {
+      setError('Customer name is required for invoice.');
+      setTimeout(() => setError(''), 3000);
+      return;
+    }
+
+    try {
+      const mockOrderData = {
+        orderId: 'PREVIEW-' + Date.now(),
+        date: new Date().toISOString()
+      };
+
+      const invoiceData = {
+        customerInfo: {
+          name: customerInfo.name.trim() || 'Sample Customer',
+          phone: customerInfo.phone.trim() || '0771234567',
+          email: customerInfo.email?.trim() || '',
+          nic: customerInfo.nic?.trim() || ''
+        },
+        items: cart.map(item => ({
+          machineId: item.machineId,
+          name: item.name,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice
+        })),
+        cart: cart,
+        extras: extras.filter(extra => extra.description && extra.amount > 0),
+        subtotal: getSubtotal(),
+        vatRate: vatRate,
+        vatAmount: getVATAmount(),
+        discountPercentage: discountPercentage,
+        discountAmount: getDiscountAmount(),
+        finalTotal: getFinalTotal()
+      };
+
+      const invoiceResult = await generateInvoice(invoiceData, mockOrderData);
+      if (invoiceResult.success) {
+        setSuccessMessage(`Invoice preview generated successfully! Downloaded as ${invoiceResult.filename}`);
+      } else {
+        setError(`Invoice preview generation failed: ${invoiceResult.message}`);
+      }
+    } catch (error) {
+      console.error('Invoice preview error:', error);
+      setError('Failed to generate invoice preview');
+    }
+
+    setTimeout(() => {
+      setError('');
+      setSuccessMessage('');
+    }, 5000);
+  };
+
 
 
   const validateSale = async () => {
@@ -308,18 +370,51 @@ const SellItem = () => {
       const response = await salesAPI.process(saleData);
       
       if (response.data.success) {
-        setSuccessMessage(`Sale processed successfully! Order ID: ${response.data.data.orderSummary.orderId}`);
+        const orderData = response.data.data.orderSummary;
+        setSuccessMessage(`Sale processed successfully! Order ID: ${orderData.orderId}`);
+        
+        // Generate and download invoice
+        try {
+          const invoiceData = {
+            customerInfo: saleData.customerInfo,
+            items: cart.map(item => ({
+              machineId: item.machineId,
+              name: item.name,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice
+            })),
+            cart: cart, // Include full cart data for invoice generation
+            extras: extras.filter(extra => extra.description && extra.amount > 0),
+            subtotal: getSubtotal(),
+            vatRate: vatRate,
+            vatAmount: getVATAmount(),
+            discountPercentage: discountPercentage,
+            discountAmount: getDiscountAmount(),
+            finalTotal: getFinalTotal()
+          };
+
+          const invoiceResult = await generateInvoice(invoiceData, orderData);
+          if (invoiceResult.success) {
+            setSuccessMessage(`Sale processed successfully! Order ID: ${orderData.orderId}. Invoice downloaded as ${invoiceResult.filename}`);
+          } else {
+            setSuccessMessage(`Sale processed successfully! Order ID: ${orderData.orderId}. Note: Invoice generation failed - ${invoiceResult.message}`);
+          }
+        } catch (invoiceError) {
+          console.error('Invoice generation error:', invoiceError);
+          setSuccessMessage(`Sale processed successfully! Order ID: ${orderData.orderId}. Note: Invoice generation failed.`);
+        }
         
         // Reset form
         setCart([]);
         setExtras([]);
         setCustomerInfo({ name: '', email: '', phone: '', nic: '' });
+        setDiscountPercentage(0);
         
         // Refresh machines to get updated stock
         await fetchMachines();
         
-        // Clear success message after 5 seconds
-        setTimeout(() => setSuccessMessage(''), 5000);
+        // Clear success message after 8 seconds (longer due to invoice message)
+        setTimeout(() => setSuccessMessage(''), 8000);
       } else {
         setError(`Sale processing failed: ${response.data.message || 'Unknown error'}`);
       }
@@ -432,7 +527,10 @@ const SellItem = () => {
                     <div key={machine._id} className="border border-slate-200 rounded-lg p-3 hover:shadow-md transition-all duration-200 bg-white/50">
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
-                          <h4 className="font-semibold text-slate-800 mb-1 text-sm">{machine.name}</h4>
+                          <div className="flex items-center gap-2 mb-1">
+                            <h4 className="font-semibold text-slate-800 text-sm">{machine.name}</h4>
+                            <span className="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded">ID: {machine.itemId}</span>
+                          </div>
                           <div className="flex items-center justify-between">
                             <span className="text-base font-bold text-slate-800">Rs. {machine.price.toFixed(2)}</span>
                             <span className={`text-xs px-2 py-1 rounded-full ${
@@ -742,7 +840,18 @@ const SellItem = () => {
         </div>
 
         {/* Process Sale Button */}
-        <div className="flex justify-center">
+        <div className="flex justify-center gap-4">
+          {/* Preview Invoice Button */}
+          <button
+            onClick={handleGenerateInvoicePreview}
+            disabled={cart.length === 0}
+            className="px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl font-medium hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shadow-lg"
+          >
+            <DocumentArrowDownIcon className="w-5 h-5 mr-2" />
+            Preview Invoice
+          </button>
+
+          {/* Complete Sale Button */}
           <button
             onClick={handleSale}
             disabled={cart.length === 0 || processing}
@@ -756,7 +865,8 @@ const SellItem = () => {
             ) : (
               <>
                 <CreditCardIcon className="w-6 h-6 mr-2" />
-                Complete Sale - Rs. {getFinalTotal().toFixed(2)}
+                <DocumentArrowDownIcon className="w-5 h-5 mr-1" />
+                Complete Sale & Generate Invoice - Rs. {getFinalTotal().toFixed(2)}
               </>
             )}
           </button>
