@@ -12,20 +12,25 @@ import {
   TruckIcon,
   EyeIcon,
   ChevronDownIcon,
-  ChevronUpIcon
+  ChevronUpIcon,
+  CalculatorIcon
 } from '@heroicons/react/24/outline';
 import { pastOrdersAPI, handleApiError } from '../services/apiService';
 
 const PastOrders = () => {
   const [orders, setOrders] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [dateFilter, setDateFilter] = useState('all');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showOrderDetails, setShowOrderDetails] = useState(false);
   const [expandedOrders, setExpandedOrders] = useState(new Set());
+  
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const ordersPerPage = 10;
 
   // Load orders from backend
   useEffect(() => {
@@ -62,32 +67,36 @@ const PastOrders = () => {
       order.customerInfo?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       order.customerInfo?.phone?.includes(searchTerm);
     
-    const matchesStatus = statusFilter === 'all' || order.orderStatus === statusFilter;
-    
-    let matchesDate = true;
-    if (dateFilter !== 'all') {
+    let matchesDateRange = true;
+    if (fromDate || toDate) {
       const orderDate = new Date(order.createdAt);
-      const now = new Date();
       
-      switch (dateFilter) {
-        case 'today':
-          matchesDate = orderDate.toDateString() === now.toDateString();
-          break;
-        case 'week':
-          const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-          matchesDate = orderDate >= weekAgo;
-          break;
-        case 'month':
-          const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-          matchesDate = orderDate >= monthAgo;
-          break;
-        default:
-          matchesDate = true;
+      if (fromDate) {
+        const fromDateTime = new Date(fromDate);
+        fromDateTime.setHours(0, 0, 0, 0);
+        matchesDateRange = matchesDateRange && orderDate >= fromDateTime;
+      }
+      
+      if (toDate) {
+        const toDateTime = new Date(toDate);
+        toDateTime.setHours(23, 59, 59, 999);
+        matchesDateRange = matchesDateRange && orderDate <= toDateTime;
       }
     }
     
-    return matchesSearch && matchesStatus && matchesDate;
+    return matchesSearch && matchesDateRange;
   }) : [];
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredOrders.length / ordersPerPage);
+  const startIndex = (currentPage - 1) * ordersPerPage;
+  const endIndex = startIndex + ordersPerPage;
+  const currentOrders = filteredOrders.slice(startIndex, endIndex);
+
+  // Reset to page 1 when search or filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, fromDate, toDate]);
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-LK', {
@@ -158,19 +167,17 @@ const PastOrders = () => {
       gradient: 'from-green-500 to-green-600'
     },
     {
-      title: 'Completed Orders',
-      value: Array.isArray(orders) 
-        ? orders.filter(order => order.orderStatus === 'Completed').length.toString()
-        : '0',
-      icon: CheckCircleIcon,
+      title: 'Filtered Orders',
+      value: filteredOrders.length.toString(),
+      icon: DocumentTextIcon,
       gradient: 'from-purple-500 to-purple-600'
     },
     {
-      title: 'Processing Orders',
-      value: Array.isArray(orders) 
-        ? orders.filter(order => order.orderStatus === 'Processing').length.toString()
-        : '0',
-      icon: ClockIcon,
+      title: 'Average Order Value',
+      value: Array.isArray(orders) && orders.length > 0
+        ? formatCurrency(orders.reduce((sum, order) => sum + (order.total || 0), 0) / orders.length)
+        : formatCurrency(0),
+      icon: CalculatorIcon,
       gradient: 'from-orange-500 to-orange-600'
     }
   ];
@@ -224,29 +231,40 @@ const PastOrders = () => {
             />
           </div>
           
-          <div className="flex space-x-4">
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="all">All Status</option>
-              <option value="Processing">Processing</option>
-              <option value="Completed">Completed</option>
-              <option value="Cancelled">Cancelled</option>
-              <option value="Returned">Returned</option>
-            </select>
+          <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4">
+            <div className="flex items-center space-x-2">
+              <CalendarDaysIcon className="w-5 h-5 text-slate-400" />
+              <label className="text-sm text-slate-600 whitespace-nowrap">From:</label>
+              <input
+                type="date"
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+                className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
             
-            <select
-              value={dateFilter}
-              onChange={(e) => setDateFilter(e.target.value)}
-              className="px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="all">All Time</option>
-              <option value="today">Today</option>
-              <option value="week">This Week</option>
-              <option value="month">This Month</option>
-            </select>
+            <div className="flex items-center space-x-2">
+              <CalendarDaysIcon className="w-5 h-5 text-slate-400" />
+              <label className="text-sm text-slate-600 whitespace-nowrap">To:</label>
+              <input
+                type="date"
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+                className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            
+            {(fromDate || toDate) && (
+              <button
+                onClick={() => {
+                  setFromDate('');
+                  setToDate('');
+                }}
+                className="px-3 py-2 text-sm text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
+              >
+                Clear Dates
+              </button>
+            )}
           </div>
         </div>
         
@@ -260,8 +278,19 @@ const PastOrders = () => {
       {/* Orders List */}
       <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
         <div className="p-6 border-b border-slate-200">
-          <h2 className="text-xl font-semibold text-slate-800">All Orders</h2>
-          <p className="text-slate-600 text-sm mt-1">{filteredOrders.length} orders found</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-semibold text-slate-800">All Orders</h2>
+              <p className="text-slate-600 text-sm mt-1">
+                {filteredOrders.length} orders found • Showing {Math.min(startIndex + 1, filteredOrders.length)}-{Math.min(endIndex, filteredOrders.length)} of {filteredOrders.length}
+              </p>
+            </div>
+            {totalPages > 1 && (
+              <div className="text-sm text-slate-600">
+                Page {currentPage} of {totalPages}
+              </div>
+            )}
+          </div>
         </div>
         
         {loading ? (
@@ -276,7 +305,7 @@ const PastOrders = () => {
           </div>
         ) : (
           <div className="divide-y divide-slate-200">
-            {filteredOrders.map((order) => {
+            {currentOrders.map((order) => {
               const StatusIcon = getStatusIcon(order.orderStatus);
               const isExpanded = expandedOrders.has(order._id);
               
@@ -442,6 +471,64 @@ const PastOrders = () => {
                 </div>
               );
             })}
+          </div>
+        )}
+        
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="p-6 border-t border-slate-200">
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-slate-600">
+                Showing {Math.min(startIndex + 1, filteredOrders.length)}-{Math.min(endIndex, filteredOrders.length)} of {filteredOrders.length} orders
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Previous
+                </button>
+                
+                <div className="flex space-x-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum;
+                    if (totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i;
+                    } else {
+                      pageNum = currentPage - 2 + i;
+                    }
+                    
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={`px-3 py-2 text-sm rounded-lg transition-colors ${
+                          currentPage === pageNum
+                            ? 'bg-blue-600 text-white'
+                            : 'border border-slate-300 hover:bg-slate-50'
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                </div>
+                
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>
