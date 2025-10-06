@@ -161,6 +161,15 @@ export const userAPI = {
   delete: (id) => api.delete(`/users/${id}`),
 };
 
+// Dashboard API
+export const dashboardAPI = {
+  // Get dashboard statistics
+  getStats: () => api.get('/dashboard/stats'),
+  
+  // Get monthly revenue data
+  getMonthlyRevenue: () => api.get('/dashboard/monthly-revenue'),
+};
+
 // Error handler utility
 export const handleApiError = (error) => {
   if (error.response) {
