@@ -142,51 +142,67 @@ const getMonthlyRevenue = async (req, res) => {
     const currentYear = today.getFullYear();
     const currentMonth = today.getMonth();
 
-    // Generate 12 months of data ending with current month
+    // Calculate start date (12 months ago)
+    let startYear = currentYear;
+    let startMonth = currentMonth - 11;
+    if (startMonth < 0) {
+      startMonth += 12;
+      startYear--;
+    }
+    const startDate = new Date(startYear, startMonth, 1);
+
+    // Use single aggregation query for all months
+    const monthlyResults = await PastOrder.aggregate([
+      { 
+        $match: { 
+          createdAt: { $gte: startDate } 
+        } 
+      },
+      {
+        $group: {
+          _id: {
+            year: { $year: "$createdAt" },
+            month: { $month: "$createdAt" }
+          },
+          revenue: { $sum: "$total" },
+          orders: { $sum: 1 }
+        }
+      },
+      { $sort: { "_id.year": 1, "_id.month": 1 } }
+    ]);
+
+    // Create a map for quick lookup
+    const dataMap = {};
+    monthlyResults.forEach(item => {
+      const key = `${item._id.year}-${item._id.month}`;
+      dataMap[key] = {
+        revenue: item.revenue,
+        orders: item.orders
+      };
+    });
+
+    // Generate complete 12-month array
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const monthlyData = [];
     
     for (let i = 11; i >= 0; i--) {
       let targetMonth = currentMonth - i;
       let targetYear = currentYear;
       
-      // Handle year boundary
       if (targetMonth < 0) {
         targetMonth += 12;
         targetYear--;
       }
       
-      const startOfMonth = new Date(targetYear, targetMonth, 1);
-      const endOfMonth = new Date(targetYear, targetMonth + 1, 0);
-      
-      // Get revenue for this month
-      const monthRevenue = await PastOrder.aggregate([
-        { 
-          $match: { 
-            createdAt: { 
-              $gte: startOfMonth, 
-              $lte: endOfMonth 
-            } 
-          } 
-        },
-        { $group: { _id: null, total: { $sum: "$total" } } }
-      ]);
-
-      // Get order count for this month
-      const monthOrders = await PastOrder.countDocuments({
-        createdAt: { 
-          $gte: startOfMonth, 
-          $lte: endOfMonth 
-        }
-      });
-
-      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                         'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const key = `${targetYear}-${targetMonth + 1}`; // MongoDB months are 1-indexed
+      const data = dataMap[key] || { revenue: 0, orders: 0 };
       
       monthlyData.push({
         month: monthNames[targetMonth],
         year: targetYear,
-        revenue: monthRevenue[0]?.total || 0,
-        orders: monthOrders,
+        revenue: data.revenue,
+        orders: data.orders,
         isCurrentMonth: targetYear === currentYear && targetMonth === currentMonth
       });
     }
