@@ -27,6 +27,10 @@ const PastOrders = () => {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showOrderDetails, setShowOrderDetails] = useState(false);
   const [expandedOrders, setExpandedOrders] = useState(new Set());
+  const [returningItem, setReturningItem] = useState(null); // Track which item is being returned
+  const [showReturnModal, setShowReturnModal] = useState(false); // Show return quantity modal
+  const [returnModalData, setReturnModalData] = useState(null); // {orderId, machineId, itemName, maxQty, currentReturned}
+  const [returnQuantity, setReturnQuantity] = useState(1); // Quantity to return
   
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
@@ -58,6 +62,76 @@ const PastOrders = () => {
       setOrders([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Handle item return
+  const handleReturnItem = (orderId, machineId, itemName, totalQuantity, returnedQuantity = 0) => {
+    const availableToReturn = totalQuantity - returnedQuantity;
+    
+    if (availableToReturn <= 0) {
+      alert('All units of this item have already been returned.');
+      return;
+    }
+
+    // Show modal for quantity selection
+    setReturnModalData({
+      orderId,
+      machineId,
+      itemName,
+      totalQuantity,
+      returnedQuantity,
+      availableToReturn
+    });
+    setReturnQuantity(availableToReturn === 1 ? 1 : 1); // Default to 1
+    setShowReturnModal(true);
+  };
+
+  // Confirm and process the return
+  const confirmReturnItem = async () => {
+    if (!returnModalData) return;
+
+    const { orderId, machineId, itemName, availableToReturn } = returnModalData;
+
+    if (returnQuantity < 1 || returnQuantity > availableToReturn) {
+      alert(`Please enter a valid quantity between 1 and ${availableToReturn}`);
+      return;
+    }
+
+    try {
+      setReturningItem(`${orderId}-${machineId}`);
+      setShowReturnModal(false);
+      
+      const response = await pastOrdersAPI.returnItem(orderId, { 
+        machineId,
+        returnQuantity: parseInt(returnQuantity)
+      });
+      
+      if (response.data.success) {
+        alert(
+          `✅ Item returned successfully!\n\n` +
+          `Item: ${itemName}\n` +
+          `Returned Quantity: ${returnQuantity}\n` +
+          `Stock Updated: ${response.data.data.updatedStock.machineName} (+${returnQuantity})`
+        );
+        
+        // Refresh orders list
+        await loadOrders();
+        
+        // Update selected order if it's the one being viewed
+        if (selectedOrder && selectedOrder._id === orderId) {
+          setSelectedOrder(response.data.data.order);
+        }
+      } else {
+        alert('Failed to return item: ' + (response.data.message || 'Unknown error'));
+      }
+    } catch (err) {
+      console.error('Error returning item:', err);
+      const errorInfo = handleApiError(err);
+      alert('Error returning item: ' + (errorInfo.message || 'Unknown error'));
+    } finally {
+      setReturningItem(null);
+      setReturnModalData(null);
     }
   };
 
@@ -439,17 +513,31 @@ const PastOrders = () => {
                         <div>
                           <h4 className="font-medium text-slate-900 mb-2">Order Items</h4>
                           <div className="space-y-3">
-                            {order.items.map((item, index) => (
-                              <div key={index} className="bg-slate-50 p-3 rounded-lg">
+                            {order.items.map((item, index) => {
+                              const isReturning = returningItem === `${order._id}-${item.machineId}`;
+                              const isReturned = item.returned === true;
+                              
+                              return (
+                              <div key={index} className={`p-3 rounded-lg border ${
+                                isReturned ? 'bg-red-50 border-red-200' : 'bg-slate-50 border-slate-200'
+                              }`}>
+                                {/* Returned Badge */}
+                                {isReturned && (
+                                  <div className="mb-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-600 text-white">
+                                    <XCircleIcon className="w-3 h-3 mr-1" />
+                                    Returned
+                                  </div>
+                                )}
+                                
                                 <div className="flex justify-between mb-2">
-                                  <span className="font-medium text-slate-800">
+                                  <span className={`font-medium text-slate-800 ${isReturned ? 'line-through opacity-60' : ''}`}>
                                     {item.name} × {item.quantity}
                                   </span>
-                                  <span className="text-slate-900 font-semibold">
+                                  <span className={`text-slate-900 font-semibold ${isReturned ? 'line-through opacity-60' : ''}`}>
                                     {formatCurrency(item.totalWithVAT || item.subtotal)}
                                   </span>
                                 </div>
-                                <div className="space-y-1 text-xs text-slate-600">
+                                <div className={`space-y-1 text-xs text-slate-600 ${isReturned ? 'opacity-60' : ''}`}>
                                   <div className="flex justify-between">
                                     <span>Unit Price (incl. VAT):</span>
                                     <span>{formatCurrency(item.unitPrice)}</span>
@@ -496,8 +584,61 @@ const PastOrders = () => {
                                     );
                                   })()}
                                 </div>
+                                
+                                {/* Return Item Button */}
+                                {!isReturned && order.orderStatus !== 'Cancelled' && (
+                                  <div className="mt-3 pt-3 border-t border-slate-200">
+                                    {/* Show partial return info if some units returned */}
+                                    {item.returnedQuantity > 0 && item.returnedQuantity < item.quantity && (
+                                      <div className="mb-2 p-2 bg-orange-50 border border-orange-200 rounded text-xs text-orange-700">
+                                        <div className="flex justify-between">
+                                          <span>Partially Returned:</span>
+                                          <span className="font-semibold">{item.returnedQuantity} of {item.quantity} units</span>
+                                        </div>
+                                        <div className="flex justify-between mt-1">
+                                          <span>Remaining:</span>
+                                          <span className="font-semibold">{item.quantity - item.returnedQuantity} units</span>
+                                        </div>
+                                      </div>
+                                    )}
+                                    <button
+                                      onClick={() => handleReturnItem(order._id, item.machineId, item.name, item.quantity, item.returnedQuantity || 0)}
+                                      disabled={isReturning}
+                                      className="w-full px-3 py-2 bg-red-50 text-red-600 border border-red-300 rounded-lg hover:bg-red-100 hover:border-red-400 transition-colors duration-200 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                                    >
+                                      {isReturning ? (
+                                        <>
+                                          <svg className="animate-spin h-4 w-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                          </svg>
+                                          Returning...
+                                        </>
+                                      ) : (
+                                        <>
+                                          <XCircleIcon className="w-4 h-4 mr-2" />
+                                          Return Item
+                                        </>
+                                      )}
+                                    </button>
+                                  </div>
+                                )}
+                                
+                                {/* Return Info */}
+                                {isReturned && item.returnedAt && (
+                                  <div className="mt-3 pt-3 border-t border-red-200">
+                                    <div className="flex items-center justify-between text-xs text-red-600">
+                                      <div className="flex items-center">
+                                        <ClockIcon className="w-3 h-3 mr-1" />
+                                        <span>Fully Returned on {new Date(item.returnedAt).toLocaleDateString()}</span>
+                                      </div>
+                                      <span className="font-semibold">{item.returnedQuantity || item.quantity} units</span>
+                                    </div>
+                                  </div>
+                                )}
                               </div>
-                            ))}
+                            );
+                            })}
                             
                             {/* Extras */}
                             {order.extras && order.extras.length > 0 && (
@@ -688,20 +829,36 @@ const PastOrders = () => {
               <div>
                 <h3 className="text-lg font-semibold text-slate-900 mb-3">Order Items</h3>
                 <div className="space-y-3">
-                  {selectedOrder.items.map((item, index) => (
-                    <div key={index} className="border border-slate-200 rounded-xl p-4 bg-white">
+                  {selectedOrder.items.map((item, index) => {
+                    const isReturning = returningItem === `${selectedOrder._id}-${item.machineId}`;
+                    const isReturned = item.returned === true;
+                    
+                    return (
+                    <div key={index} className={`border rounded-xl p-4 ${
+                      isReturned ? 'bg-red-50 border-red-300' : 'border-slate-200 bg-white'
+                    }`}>
+                      {/* Returned Badge */}
+                      {isReturned && (
+                        <div className="mb-3 inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-600 text-white">
+                          <XCircleIcon className="w-4 h-4 mr-2" />
+                          Item Returned
+                        </div>
+                      )}
+                      
                       <div className="flex items-center justify-between mb-3">
-                        <div>
+                        <div className={isReturned ? 'opacity-60' : ''}>
                           <p className="font-medium text-slate-900">{item.name}</p>
                           <p className="text-sm text-slate-500">Item ID: {item.itemId}</p>
                         </div>
                         <div className="text-right">
-                          <p className="font-bold text-lg">{formatCurrency(item.totalWithVAT || item.subtotal)}</p>
+                          <p className={`font-bold text-lg ${isReturned ? 'line-through text-slate-400' : ''}`}>
+                            {formatCurrency(item.totalWithVAT || item.subtotal)}
+                          </p>
                           <p className="text-xs text-slate-500">Total with VAT</p>
                         </div>
                       </div>
                       
-                      <div className="grid grid-cols-2 gap-3 text-sm bg-slate-50 p-3 rounded-lg">
+                      <div className={`grid grid-cols-2 gap-3 text-sm bg-slate-50 p-3 rounded-lg ${isReturned ? 'opacity-60' : ''}`}>
                         <div>
                           <p className="text-slate-500">Quantity:</p>
                           <p className="font-medium">{item.quantity}</p>
@@ -755,8 +912,58 @@ const PastOrders = () => {
                           );
                         })()}
                       </div>
+                      
+                      {/* Return Item Button */}
+                      {!isReturned && selectedOrder.orderStatus !== 'Cancelled' && (
+                        <div className="mt-4 pt-4 border-t border-slate-200">
+                          {/* Show partial return info if some units returned */}
+                          {item.returnedQuantity > 0 && item.returnedQuantity < item.quantity && (
+                            <div className="mb-3 p-3 bg-orange-50 border border-orange-200 rounded-lg text-sm text-orange-700">
+                              <div className="flex justify-between">
+                                <span>Partially Returned:</span>
+                                <span className="font-semibold">{item.returnedQuantity} of {item.quantity} units</span>
+                              </div>
+                              <div className="flex justify-between mt-1">
+                                <span>Remaining:</span>
+                                <span className="font-semibold">{item.quantity - item.returnedQuantity} units</span>
+                              </div>
+                            </div>
+                          )}
+                          <button
+                            onClick={() => handleReturnItem(selectedOrder._id, item.machineId, item.name, item.quantity, item.returnedQuantity || 0)}
+                            disabled={isReturning}
+                            className="w-full px-4 py-2 bg-red-50 text-red-600 border border-red-300 rounded-lg hover:bg-red-100 hover:border-red-400 transition-colors duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                          >
+                            {isReturning ? (
+                              <>
+                                <svg className="animate-spin h-5 w-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                Processing Return...
+                              </>
+                            ) : (
+                              <>
+                                <XCircleIcon className="w-5 h-5 mr-2" />
+                                Return Item
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      )}
+                      
+                      {/* Return Information */}
+                      {isReturned && item.returnedAt && (
+                        <div className="mt-4 pt-4 border-t border-red-200">
+                          <div className="flex items-center text-sm text-red-600">
+                            <ClockIcon className="w-4 h-4 mr-2" />
+                            <span>Returned on {new Date(item.returnedAt).toLocaleDateString()} at {new Date(item.returnedAt).toLocaleTimeString()}</span>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  ))}
+                  );
+                  })}
                   
                   {/* Extras */}
                   {selectedOrder.extras && selectedOrder.extras.length > 0 && (
@@ -816,6 +1023,126 @@ const PastOrders = () => {
           </div>
         </div>
       )}
+
+      {/* Return Quantity Modal */}
+      {showReturnModal && returnModalData && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-8 max-w-md w-full shadow-2xl">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-slate-800 flex items-center">
+                <XCircleIcon className="w-7 h-7 mr-2 text-red-600" />
+                Return Item
+              </h2>
+              <button
+                onClick={() => {
+                  setShowReturnModal(false);
+                  setReturnModalData(null);
+                }}
+                className="p-2 hover:bg-slate-100 rounded-lg transition-colors duration-200"
+              >
+                <XCircleIcon className="w-6 h-6 text-slate-500" />
+              </button>
+            </div>
+
+            {/* Item Details */}
+            <div className="mb-6 p-4 bg-slate-50 rounded-lg">
+              <h3 className="font-semibold text-slate-800 mb-3">{returnModalData.itemName}</h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-slate-600">Total Quantity:</span>
+                  <span className="font-semibold text-slate-900">{returnModalData.totalQuantity} units</span>
+                </div>
+                {returnModalData.returnedQuantity > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-slate-600">Already Returned:</span>
+                    <span className="font-semibold text-orange-600">{returnModalData.returnedQuantity} units</span>
+                  </div>
+                )}
+                <div className="flex justify-between pt-2 border-t border-slate-200">
+                  <span className="text-slate-600">Available to Return:</span>
+                  <span className="font-bold text-green-600">{returnModalData.availableToReturn} units</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Quantity Input */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                How many units do you want to return?
+              </label>
+              <input
+                type="number"
+                min="1"
+                max={returnModalData.availableToReturn}
+                value={returnQuantity}
+                onChange={(e) => setReturnQuantity(parseInt(e.target.value) || 1)}
+                className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 text-lg font-semibold text-center"
+              />
+              <div className="mt-2 flex justify-between text-xs text-slate-500">
+                <span>Minimum: 1</span>
+                <span>Maximum: {returnModalData.availableToReturn}</span>
+              </div>
+            </div>
+
+            {/* Quick Select Buttons */}
+            {returnModalData.availableToReturn > 1 && (
+              <div className="mb-6">
+                <p className="text-sm text-slate-600 mb-2">Quick select:</p>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    onClick={() => setReturnQuantity(1)}
+                    className="px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-medium transition-colors duration-200"
+                  >
+                    1 unit
+                  </button>
+                  {returnModalData.availableToReturn >= 2 && (
+                    <button
+                      onClick={() => setReturnQuantity(Math.floor(returnModalData.availableToReturn / 2))}
+                      className="px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-medium transition-colors duration-200"
+                    >
+                      Half
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setReturnQuantity(returnModalData.availableToReturn)}
+                    className="px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-medium transition-colors duration-200"
+                  >
+                    All ({returnModalData.availableToReturn})
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Warning Message */}
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-sm text-red-800">
+                <strong>⚠️ Warning:</strong> This will return {returnQuantity} unit{returnQuantity > 1 ? 's' : ''} to inventory. This action cannot be undone.
+              </p>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowReturnModal(false);
+                  setReturnModalData(null);
+                }}
+                className="flex-1 px-4 py-3 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors duration-200 font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmReturnItem}
+                className="flex-1 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors duration-200 font-medium flex items-center justify-center"
+              >
+                <XCircleIcon className="w-5 h-5 mr-2" />
+                Confirm Return
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
