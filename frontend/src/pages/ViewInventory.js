@@ -5,9 +5,11 @@ import {
   EyeIcon, 
   PencilIcon, 
   TrashIcon,
-  XMarkIcon
+  XMarkIcon,
+  ShoppingCartIcon
 } from '@heroicons/react/24/outline';
 import { machineService } from '../services/machineService';
+import { pastOrdersAPI } from '../services/apiService';
 
 const ViewInventory = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -19,6 +21,8 @@ const ViewInventory = () => {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedMachine, setSelectedMachine] = useState(null);
+  const [salesStats, setSalesStats] = useState(null);
+  const [loadingStats, setLoadingStats] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const [editFormData, setEditFormData] = useState({
@@ -119,9 +123,24 @@ const ViewInventory = () => {
 
 
 
-  const handleViewDetails = (machine) => {
+  const handleViewDetails = async (machine) => {
     setSelectedMachine(machine);
     setShowDetailsModal(true);
+    setSalesStats(null);
+    
+    // Fetch sales statistics
+    try {
+      setLoadingStats(true);
+      const response = await pastOrdersAPI.getMachineSalesStats(machine._id);
+      if (response.data.success) {
+        setSalesStats(response.data.data);
+      }
+    } catch (err) {
+      console.error('Error fetching sales stats:', err);
+      setSalesStats(null);
+    } finally {
+      setLoadingStats(false);
+    }
   };
 
   const handleEdit = (machine) => {
@@ -476,6 +495,38 @@ const ViewInventory = () => {
                   <label className="block text-sm font-semibold text-slate-700 mb-1">Last Updated</label>
                   <p className="text-slate-800 bg-slate-50 p-3 rounded-lg">{formatDate(selectedMachine.updatedAt)}</p>
                 </div>
+              </div>
+
+              {/* Sold Items Count Section */}
+              <div className="pt-6 border-t border-slate-200">
+                <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center">
+                  <ShoppingCartIcon className="w-6 h-6 mr-2 text-blue-600" />
+                  Sold Items Count
+                </h3>
+                
+                {loadingStats ? (
+                  <div className="text-center py-6">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                    <p className="text-slate-500 text-sm">Loading...</p>
+                  </div>
+                ) : salesStats ? (
+                  <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-6 rounded-xl border border-blue-200">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-blue-600 mb-1">TOTAL SOLD</p>
+                        <p className="text-4xl font-bold text-blue-900">{salesStats.totalSold || 0}</p>
+                        <p className="text-sm text-blue-700 mt-2">Units sold</p>
+                      </div>
+                      <ShoppingCartIcon className="w-16 h-16 text-blue-300" />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8 bg-slate-50 rounded-lg">
+                    <ShoppingCartIcon className="w-12 h-12 text-slate-300 mx-auto mb-2" />
+                    <p className="text-slate-500">No sales data available</p>
+                    <p className="text-sm text-slate-400 mt-1">This item hasn't been sold yet</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>

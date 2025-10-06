@@ -138,7 +138,8 @@ const processSale = async (req, res) => {
         name: customerInfo.name,
         phone: customerInfo.phone,
         email: customerInfo.email || customer.email,
-        nic: customerInfo.nic || customer.nic
+        nic: customerInfo.nic || customer.nic,
+        address: customerInfo.address || customer.address
       },
       items: processedItems,
       extras: processedExtras,

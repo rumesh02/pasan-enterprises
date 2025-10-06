@@ -107,7 +107,7 @@ const getCustomerById = async (req, res) => {
 // @access  Public
 const createCustomer = async (req, res) => {
   try {
-    const { name, phone, email, nic } = req.body;
+    const { name, phone, email, nic, address } = req.body;
 
     // Check if customer already exists by phone or NIC
     const existingCustomer = await Customer.findByPhoneOrNIC(phone, nic);
@@ -124,7 +124,8 @@ const createCustomer = async (req, res) => {
       name,
       phone,
       email,
-      nic
+      nic,
+      address
     });
 
     const savedCustomer = await customer.save();
@@ -166,7 +167,7 @@ const createCustomer = async (req, res) => {
 // @access  Public
 const updateCustomer = async (req, res) => {
   try {
-    const { name, phone, email, nic } = req.body;
+    const { name, phone, email, nic, address } = req.body;
 
     // Check if phone or NIC is being updated and if it already exists
     if (phone || nic) {
@@ -190,7 +191,7 @@ const updateCustomer = async (req, res) => {
 
     const customer = await Customer.findByIdAndUpdate(
       req.params.id,
-      { name, phone, email, nic },
+      { name, phone, email, nic, address },
       { new: true, runValidators: true }
     );
 
@@ -286,7 +287,7 @@ const deleteCustomer = async (req, res) => {
 // @access  Private
 const findOrCreateCustomer = async (customerData) => {
   try {
-    const { name, phone, email, nic } = customerData;
+    const { name, phone, email, nic, address } = customerData;
 
     // First try to find existing customer by phone or NIC
     let customer = await Customer.findByPhoneOrNIC(phone, nic);
@@ -310,6 +311,12 @@ const findOrCreateCustomer = async (customerData) => {
         needsUpdate = true;
       }
       
+      // Update address if provided
+      if (address && customer.address !== address) {
+        customer.address = address;
+        needsUpdate = true;
+      }
+      
       if (needsUpdate) {
         await customer.save();
       }
@@ -322,7 +329,8 @@ const findOrCreateCustomer = async (customerData) => {
       name,
       phone,
       email,
-      nic
+      nic,
+      address
     });
 
     await customer.save();

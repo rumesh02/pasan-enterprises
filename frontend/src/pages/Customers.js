@@ -28,7 +28,8 @@ const Customers = () => {
     name: '',
     email: '',
     phone: '',
-    nic: ''
+    nic: '',
+    address: ''
   });
 
   // Load customers from backend
@@ -71,7 +72,8 @@ const Customers = () => {
       name: '',
       email: '',
       phone: '',
-      nic: ''
+      nic: '',
+      address: ''
     });
     setEditingCustomer(null);
     setShowAddModal(true);
@@ -82,7 +84,8 @@ const Customers = () => {
       name: customer.name,
       email: customer.email,
       phone: customer.phone,
-      nic: customer.nic
+      nic: customer.nic,
+      address: customer.address || ''
     });
     setEditingCustomer(customer._id);
     setShowAddModal(true);
@@ -425,6 +428,26 @@ const Customers = () => {
                   onChange={(e) => setFormData({...formData, nic: e.target.value})}
                   className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="Enter NIC number (optional - e.g., 123456789V or 199812345678)"
+                  disabled={submitting}
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  <span className="flex items-center space-x-2">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    <span>Address</span>
+                  </span>
+                </label>
+                <textarea
+                  value={formData.address}
+                  onChange={(e) => setFormData({...formData, address: e.target.value})}
+                  className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Enter customer address (optional)"
+                  rows="3"
                   disabled={submitting}
                 />
               </div>
