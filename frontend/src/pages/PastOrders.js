@@ -151,6 +151,13 @@ const PastOrders = () => {
     setShowOrderDetails(true);
   };
 
+  // Calculate this year's orders
+  const currentYear = new Date().getFullYear();
+  const thisYearOrders = Array.isArray(orders) ? orders.filter(order => {
+    const orderYear = new Date(order.createdAt).getFullYear();
+    return orderYear === currentYear;
+  }) : [];
+
   const stats = [
     {
       title: 'Total Orders',
@@ -159,26 +166,26 @@ const PastOrders = () => {
       gradient: 'from-blue-500 to-blue-600'
     },
     {
-      title: 'Total Revenue',
-      value: Array.isArray(orders) 
-        ? formatCurrency(orders.reduce((sum, order) => sum + (order.total || 0), 0))
-        : formatCurrency(0),
-      icon: CurrencyDollarIcon,
-      gradient: 'from-green-500 to-green-600'
-    },
-    {
       title: 'Filtered Orders',
       value: filteredOrders.length.toString(),
       icon: DocumentTextIcon,
       gradient: 'from-purple-500 to-purple-600'
     },
     {
-      title: 'Average Order Value',
-      value: Array.isArray(orders) && orders.length > 0
-        ? formatCurrency(orders.reduce((sum, order) => sum + (order.total || 0), 0) / orders.length)
+      title: 'Filtered Orders Revenue',
+      value: filteredOrders.length > 0
+        ? formatCurrency(filteredOrders.reduce((sum, order) => sum + (order.total || 0), 0))
         : formatCurrency(0),
       icon: CalculatorIcon,
       gradient: 'from-orange-500 to-orange-600'
+    },
+    {
+      title: 'Total Revenue This Year',
+      value: thisYearOrders.length > 0
+        ? formatCurrency(thisYearOrders.reduce((sum, order) => sum + (order.total || 0), 0))
+        : formatCurrency(0),
+      icon: CurrencyDollarIcon,
+      gradient: 'from-green-500 to-green-600'
     }
   ];
 
