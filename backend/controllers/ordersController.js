@@ -611,6 +611,72 @@ const updateOrder = async (req, res) => {
   }
 };
 
+// @desc    Get sales statistics for a specific machine
+// @desc    Get sales statistics for a specific machine
+// @route   GET /api/past-orders/machine-stats/:machineId
+// @access  Public
+const getMachineSalesStats = async (req, res) => {
+  try {
+    const { machineId } = req.params;
+    const mongoose = require('mongoose');
+
+    // Aggregate sales data for this machine
+    const salesData = await PastOrder.aggregate([
+      // Unwind items array to work with individual items
+      { $unwind: '$items' },
+      
+      // Match items with the specified machineId
+      { 
+        $match: { 
+          'items.machineId': new mongoose.Types.ObjectId(machineId)
+        } 
+      },
+      
+      // Group to calculate total sold (quantity - returned quantity)
+      {
+        $group: {
+          _id: '$items.machineId',
+          totalSold: { 
+            $sum: { 
+              $subtract: [
+                '$items.quantity', 
+                { $ifNull: ['$items.returnedQuantity', 0] }
+              ] 
+            } 
+          }
+        }
+      }
+    ]);
+
+    // If no sales found, return zero
+    if (salesData.length === 0) {
+      return res.status(200).json({
+        success: true,
+        data: {
+          machineId,
+          totalSold: 0
+        }
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        machineId,
+        totalSold: salesData[0].totalSold
+      }
+    });
+
+  } catch (error) {
+    console.error('Error getting machine sales stats:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server Error',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   getAllOrders,
   getOrderById,
@@ -620,5 +686,6 @@ module.exports = {
   getOrdersByDateRange,
   deleteOrder,
   returnItem,
-  updateOrder
+  updateOrder,
+  getMachineSalesStats
 };

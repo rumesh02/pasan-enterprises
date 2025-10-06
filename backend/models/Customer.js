@@ -83,6 +83,11 @@ const customerSchema = new mongoose.Schema({
       message: 'Please enter a valid NIC number (9 digits + V/X or 12 digits)'
     }
   },
+  address: {
+    type: String,
+    trim: true,
+    maxlength: [500, 'Address cannot exceed 500 characters']
+  },
   totalOrders: {
     type: Number,
     default: 0,
