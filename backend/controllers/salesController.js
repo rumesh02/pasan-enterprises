@@ -58,8 +58,28 @@ const processSale = async (req, res) => {
         throw new Error(`Insufficient stock for ${machine.name}. Available: ${machine.quantity}, Requested: ${item.quantity}`);
       }
 
-      // Calculate item subtotal
-      const itemSubtotal = machine.price * item.quantity;
+      // Get per-item VAT percentage (default 18% if not provided)
+      const itemVatPercentage = item.vatPercentage !== undefined ? item.vatPercentage : 18;
+      
+      // Get warranty months (default 12 if not provided)
+      const warrantyMonths = item.warrantyMonths !== undefined ? item.warrantyMonths : 12;
+
+      // The machine.price stored in database already includes VAT
+      // Calculate VAT amount: VAT = (VAT% / 100) × Total Price
+      const vatAmountPerUnit = (itemVatPercentage / 100) * machine.price;
+      
+      // Calculate base price: Base Price = Total Price - VAT Amount
+      const basePricePerUnit = machine.price - vatAmountPerUnit;
+      
+      // Calculate item subtotal (base price × quantity, without VAT)
+      const itemSubtotal = basePricePerUnit * item.quantity;
+      
+      // Calculate total VAT for this item
+      const itemVatAmount = vatAmountPerUnit * item.quantity;
+      
+      // Calculate total with VAT for this item
+      const itemTotalWithVAT = machine.price * item.quantity;
+      
       subtotal += itemSubtotal;
 
       processedItems.push({
@@ -68,8 +88,12 @@ const processSale = async (req, res) => {
         name: machine.name,
         category: machine.category,
         quantity: item.quantity,
-        unitPrice: machine.price,
-        subtotal: itemSubtotal
+        unitPrice: machine.price, // Store the full price (includes VAT)
+        vatPercentage: itemVatPercentage,
+        vatAmount: itemVatAmount,
+        warrantyMonths: warrantyMonths,
+        subtotal: itemSubtotal, // Base price * quantity (without VAT)
+        totalWithVAT: itemTotalWithVAT
       });
 
       // Update machine stock
@@ -90,10 +114,16 @@ const processSale = async (req, res) => {
 
     const extrasTotal = processedExtras.reduce((sum, extra) => sum + extra.amount, 0);
     
-    // Calculate VAT and discount
-    const vatAmount = (subtotal * vatRate) / 100;
-    const totalBeforeDiscount = subtotal + vatAmount;
+    // Calculate total VAT from all items (already calculated per item)
+    const totalVatAmount = processedItems.reduce((sum, item) => sum + item.vatAmount, 0);
+    
+    // Calculate total before discount (subtotal + VAT)
+    const totalBeforeDiscount = subtotal + totalVatAmount;
+    
+    // Calculate discount amount
     const discountAmount = (totalBeforeDiscount * discountPercentage) / 100;
+    
+    // Calculate final total
     const finalTotal = totalBeforeDiscount - discountAmount + extrasTotal;
     
     const total = subtotal + extrasTotal; // Keep for backward compatibility
@@ -113,8 +143,8 @@ const processSale = async (req, res) => {
       items: processedItems,
       extras: processedExtras,
       subtotal,
-      vatRate,
-      vatAmount,
+      vatRate: vatRate, // Keep for reference (not used in calculation anymore)
+      vatAmount: totalVatAmount,
       totalBeforeDiscount,
       discountPercentage,
       discountAmount,
@@ -147,8 +177,8 @@ const processSale = async (req, res) => {
           orderId: order.orderId,
           itemCount: processedItems.reduce((sum, item) => sum + item.quantity, 0),
           subtotal,
-          vatRate,
-          vatAmount,
+          vatRate, // Keep for reference
+          vatAmount: totalVatAmount,
           totalBeforeDiscount,
           discountPercentage,
           discountAmount,
