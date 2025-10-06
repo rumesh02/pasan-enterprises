@@ -24,7 +24,7 @@ const ViewInventory = () => {
   const [salesStats, setSalesStats] = useState(null);
   const [loadingStats, setLoadingStats] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
+  const [itemsPerPage] = useState(20);
   const [editFormData, setEditFormData] = useState({
     itemId: '',
     name: '',
@@ -45,7 +45,8 @@ const ViewInventory = () => {
   const fetchMachines = async () => {
     try {
       setLoading(true);
-      const response = await machineService.getAllMachines();
+      // Use a reasonable limit of 200 for better performance while still showing most inventory
+      const response = await machineService.getAllMachines({ limit: 200 });
       console.log('API Response:', response); // Debug log
       
       // The backend returns machines in response.data
@@ -262,7 +263,7 @@ const ViewInventory = () => {
       {loading && (
         <div className="bg-white/60 backdrop-blur-sm rounded-2xl shadow-xl border border-slate-200/50 p-12">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <div className="animate-spin-fast rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
             <p className="text-slate-600">Loading machines...</p>
           </div>
         </div>

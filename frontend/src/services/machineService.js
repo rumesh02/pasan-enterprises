@@ -13,9 +13,11 @@ const API_BASE_URL = getBaseURL();
 // Machine API Service
 export const machineService = {
   // Get all machines
-  getAllMachines: async () => {
+  getAllMachines: async (params = {}) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/machines`);
+      const queryString = new URLSearchParams(params).toString();
+      const url = queryString ? `${API_BASE_URL}/machines?${queryString}` : `${API_BASE_URL}/machines`;
+      const response = await fetch(url);
       const data = await response.json();
       
       if (!response.ok) {
