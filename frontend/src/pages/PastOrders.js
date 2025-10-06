@@ -106,6 +106,31 @@ const PastOrders = () => {
     }).format(amount);
   };
 
+  // Calculate warranty expiry date and remaining time
+  const getWarrantyInfo = (orderDate, warrantyMonths) => {
+    const soldDate = new Date(orderDate);
+    const expiryDate = new Date(soldDate);
+    expiryDate.setMonth(expiryDate.getMonth() + warrantyMonths);
+    
+    const today = new Date();
+    const daysRemaining = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
+    
+    const isExpired = daysRemaining < 0;
+    const isExpiringSoon = daysRemaining > 0 && daysRemaining <= 30;
+    
+    return {
+      expiryDate,
+      daysRemaining: Math.abs(daysRemaining),
+      isExpired,
+      isExpiringSoon,
+      formattedExpiry: expiryDate.toLocaleDateString('en-GB', { 
+        day: '2-digit', 
+        month: 'short', 
+        year: 'numeric' 
+      })
+    };
+  };
+
   const getStatusColor = (status) => {
     switch (status) {
       case 'Completed':
@@ -413,15 +438,64 @@ const PastOrders = () => {
                         {/* Items */}
                         <div>
                           <h4 className="font-medium text-slate-900 mb-2">Order Items</h4>
-                          <div className="space-y-2">
+                          <div className="space-y-3">
                             {order.items.map((item, index) => (
-                              <div key={index} className="flex justify-between text-sm">
-                                <span className="text-slate-600">
-                                  {item.name} × {item.quantity}
-                                </span>
-                                <span className="text-slate-900 font-medium">
-                                  {formatCurrency(item.subtotal)}
-                                </span>
+                              <div key={index} className="bg-slate-50 p-3 rounded-lg">
+                                <div className="flex justify-between mb-2">
+                                  <span className="font-medium text-slate-800">
+                                    {item.name} × {item.quantity}
+                                  </span>
+                                  <span className="text-slate-900 font-semibold">
+                                    {formatCurrency(item.totalWithVAT || item.subtotal)}
+                                  </span>
+                                </div>
+                                <div className="space-y-1 text-xs text-slate-600">
+                                  <div className="flex justify-between">
+                                    <span>Unit Price (incl. VAT):</span>
+                                    <span>{formatCurrency(item.unitPrice)}</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span>Machine Price ({item.quantity}x):</span>
+                                    <span>{formatCurrency(item.subtotal)}</span>
+                                  </div>
+                                  <div className="flex justify-between text-blue-600">
+                                    <span>VAT ({item.vatPercentage || 0}%):</span>
+                                    <span>{formatCurrency(item.vatAmount || 0)}</span>
+                                  </div>
+                                  {item.warrantyMonths !== undefined && (() => {
+                                    const warrantyInfo = getWarrantyInfo(order.createdAt, item.warrantyMonths);
+                                    return (
+                                      <>
+                                        <div className="flex justify-between">
+                                          <span className="text-slate-600">Warranty:</span>
+                                          <span className="text-slate-900">{item.warrantyMonths} months</span>
+                                        </div>
+                                        <div className={`flex justify-between font-medium ${
+                                          warrantyInfo.isExpired ? 'text-red-600' : 
+                                          warrantyInfo.isExpiringSoon ? 'text-orange-600' : 
+                                          'text-green-600'
+                                        }`}>
+                                          <span>
+                                            {warrantyInfo.isExpired ? 'Expired:' : 'Expires:'}
+                                          </span>
+                                          <span>{warrantyInfo.formattedExpiry}</span>
+                                        </div>
+                                        <div className={`flex justify-between text-xs ${
+                                          warrantyInfo.isExpired ? 'text-red-500' : 
+                                          warrantyInfo.isExpiringSoon ? 'text-orange-500' : 
+                                          'text-green-500'
+                                        }`}>
+                                          <span>
+                                            {warrantyInfo.isExpired ? 
+                                              `Expired ${warrantyInfo.daysRemaining} days ago` : 
+                                              `${warrantyInfo.daysRemaining} days remaining`
+                                            }
+                                          </span>
+                                        </div>
+                                      </>
+                                    );
+                                  })()}
+                                </div>
                               </div>
                             ))}
                             
@@ -615,14 +689,71 @@ const PastOrders = () => {
                 <h3 className="text-lg font-semibold text-slate-900 mb-3">Order Items</h3>
                 <div className="space-y-3">
                   {selectedOrder.items.map((item, index) => (
-                    <div key={index} className="flex items-center justify-between p-4 border border-slate-200 rounded-xl">
-                      <div>
-                        <p className="font-medium text-slate-900">{item.name}</p>
-                        <p className="text-sm text-slate-500">Quantity: {item.quantity} × {formatCurrency(item.unitPrice)} each</p>
+                    <div key={index} className="border border-slate-200 rounded-xl p-4 bg-white">
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <p className="font-medium text-slate-900">{item.name}</p>
+                          <p className="text-sm text-slate-500">Item ID: {item.itemId}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-bold text-lg">{formatCurrency(item.totalWithVAT || item.subtotal)}</p>
+                          <p className="text-xs text-slate-500">Total with VAT</p>
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <p className="font-medium">{formatCurrency(item.subtotal)}</p>
-                        <p className="text-sm text-slate-500">subtotal</p>
+                      
+                      <div className="grid grid-cols-2 gap-3 text-sm bg-slate-50 p-3 rounded-lg">
+                        <div>
+                          <p className="text-slate-500">Quantity:</p>
+                          <p className="font-medium">{item.quantity}</p>
+                        </div>
+                        <div>
+                          <p className="text-slate-500">Unit Price:</p>
+                          <p className="font-medium">{formatCurrency(item.unitPrice)}</p>
+                        </div>
+                        <div>
+                          <p className="text-slate-500">Machine Price ({item.quantity}x):</p>
+                          <p className="font-medium">{formatCurrency(item.subtotal)}</p>
+                        </div>
+                        <div>
+                          <p className="text-blue-600">VAT ({item.vatPercentage || 0}%):</p>
+                          <p className="font-medium text-blue-600">{formatCurrency(item.vatAmount || 0)}</p>
+                        </div>
+                        {item.warrantyMonths !== undefined && (() => {
+                          const warrantyInfo = getWarrantyInfo(selectedOrder.createdAt, item.warrantyMonths);
+                          return (
+                            <>
+                              <div className="col-span-2 border-t border-slate-200 pt-2 mt-2">
+                                <p className="text-slate-700 font-medium mb-2">Warranty Information</p>
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div>
+                                    <p className="text-slate-500">Duration:</p>
+                                    <p className="font-medium">{item.warrantyMonths} months</p>
+                                  </div>
+                                  <div>
+                                    <p className={warrantyInfo.isExpired ? 'text-red-600' : warrantyInfo.isExpiringSoon ? 'text-orange-600' : 'text-green-600'}>
+                                      {warrantyInfo.isExpired ? 'Expired:' : 'Expires:'}
+                                    </p>
+                                    <p className={`font-medium ${warrantyInfo.isExpired ? 'text-red-600' : warrantyInfo.isExpiringSoon ? 'text-orange-600' : 'text-green-600'}`}>
+                                      {warrantyInfo.formattedExpiry}
+                                    </p>
+                                  </div>
+                                  <div className="col-span-2">
+                                    <div className={`px-3 py-2 rounded-lg text-center font-medium ${
+                                      warrantyInfo.isExpired ? 'bg-red-100 text-red-700' : 
+                                      warrantyInfo.isExpiringSoon ? 'bg-orange-100 text-orange-700' : 
+                                      'bg-green-100 text-green-700'
+                                    }`}>
+                                      {warrantyInfo.isExpired ? 
+                                        `Expired ${warrantyInfo.daysRemaining} days ago` : 
+                                        `${warrantyInfo.daysRemaining} days remaining`
+                                      }
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </>
+                          );
+                        })()}
                       </div>
                     </div>
                   ))}

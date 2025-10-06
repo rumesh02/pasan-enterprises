@@ -1,4 +1,14 @@
-const API_BASE_URL = 'http://localhost:5000/api';
+// Determine the API base URL based on environment
+const getBaseURL = () => {
+  // Check if running on localhost (development)
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    return 'http://localhost:5000/api';
+  }
+  // Production URL
+  return 'https://pasan-enterprises.me/api';
+};
+
+const API_BASE_URL = getBaseURL();
 
 class AuthService {
   // Login user
