@@ -25,7 +25,8 @@ const SellItem = () => {
     name: '',
     email: '',
     phone: '',
-    nic: ''
+    nic: '',
+    address: ''
   });
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
@@ -281,7 +282,8 @@ const SellItem = () => {
           name: customerInfo.name.trim() || 'Sample Customer',
           phone: customerInfo.phone.trim() || '0771234567',
           email: customerInfo.email?.trim() || '',
-          nic: customerInfo.nic?.trim() || ''
+          nic: customerInfo.nic?.trim() || '',
+          address: customerInfo.address?.trim() || ''
         },
         items: cart.map(item => ({
           machineId: item.machineId,
@@ -414,7 +416,8 @@ const SellItem = () => {
           name: customerInfo.name.trim(),
           phone: customerInfo.phone.trim(),
           email: customerInfo.email?.trim() || '',
-          nic: customerInfo.nic?.trim() || ''
+          nic: customerInfo.nic?.trim() || '',
+          address: customerInfo.address?.trim() || ''
         },
         items: cart.map(item => ({
           machineId: item.machineId,
@@ -474,7 +477,7 @@ const SellItem = () => {
         // Reset form
         setCart([]);
         setExtras([]);
-        setCustomerInfo({ name: '', email: '', phone: '', nic: '' });
+        setCustomerInfo({ name: '', email: '', phone: '', nic: '', address: '' });
         setDiscountPercentage(0);
         
         // Refresh machines to get updated stock
@@ -937,6 +940,18 @@ const SellItem = () => {
               className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/50"
             />
           </div>
+        </div>
+
+        {/* Address Field - Full Width */}
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-slate-700 mb-2">Address (Optional)</label>
+          <textarea
+            placeholder="Enter customer address"
+            value={customerInfo.address}
+            onChange={(e) => setCustomerInfo({...customerInfo, address: e.target.value})}
+            className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/50"
+            rows="2"
+          />
         </div>
 
         {/* Process Sale Button */}

@@ -180,6 +180,26 @@ const PastOrders = () => {
     }).format(amount);
   };
 
+  // Format order ID to show number and date separately
+  const formatOrderId = (orderId) => {
+    if (!orderId) return 'N/A';
+    
+    // Extract parts from format: ORD-YYYYMMDD-NUMBER
+    const parts = orderId.split('-');
+    if (parts.length !== 3) return orderId;
+    
+    const dateStr = parts[1]; // YYYYMMDD
+    const orderNum = parts[2]; // NUMBER
+    
+    // Format date as YYYY/MM/DD
+    const year = dateStr.substring(0, 4);
+    const month = dateStr.substring(4, 6);
+    const day = dateStr.substring(6, 8);
+    const formattedDate = `${year}/${month}/${day}`;
+    
+    return `${orderNum} | ${formattedDate}`;
+  };
+
   // Calculate warranty expiry date and remaining time
   const getWarrantyInfo = (orderDate, warrantyMonths) => {
     const soldDate = new Date(orderDate);
@@ -422,7 +442,7 @@ const PastOrders = () => {
                       <div className="flex items-center space-x-4">
                         <div>
                           <h3 className="text-lg font-semibold text-slate-900">
-                            Order #{order.orderId}
+                            Order {formatOrderId(order.orderId)}
                           </h3>
                           <div className="flex items-center space-x-4 mt-1">
                             <div className="flex items-center space-x-2">
@@ -761,7 +781,7 @@ const PastOrders = () => {
           <div className="bg-white rounded-2xl p-8 max-w-2xl w-full mx-4 max-h-screen overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold text-slate-800">
-                Order Details - #{selectedOrder.orderId}
+                Order Details - {formatOrderId(selectedOrder.orderId)}
               </h2>
               <button
                 onClick={() => setShowOrderDetails(false)}

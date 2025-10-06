@@ -9,13 +9,19 @@ const {
   getOrdersByDateRange,
   deleteOrder,
   returnItem,
-  updateOrder
+  updateOrder,
+  getMachineSalesStats
 } = require('../controllers/ordersController');
 
 // @route   GET /api/past-orders/stats
 // @desc    Get order statistics
 // @access  Public
 router.get('/stats', getOrderStats);
+
+// @route   GET /api/past-orders/machine-stats/:machineId
+// @desc    Get sales statistics for a specific machine
+// @access  Public
+router.get('/machine-stats/:machineId', getMachineSalesStats);
 
 // @route   GET /api/past-orders/range
 // @desc    Get orders by date range
