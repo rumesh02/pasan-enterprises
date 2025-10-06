@@ -18,6 +18,26 @@ import {
 import { pastOrdersAPI, handleApiError } from '../services/apiService';
 
 const PastOrders = () => {
+  // Helper function to format dates as DD/MM/YYYY
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  };
+
+  // Helper function to format date and time as DD/MM/YYYY HH:MM
+  const formatDateTime = (dateString) => {
+    const date = new Date(dateString);
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear();
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    return `${day}/${month}/${year} ${hours}:${minutes}`;
+  };
+
   const [orders, setOrders] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [fromDate, setFromDate] = useState('');
@@ -45,7 +65,7 @@ const PastOrders = () => {
     try {
       setLoading(true);
       setError('');
-      const response = await pastOrdersAPI.getAll();
+      const response = await pastOrdersAPI.getAll({ limit: 500 }); // Request a high limit to get all orders
       console.log('Orders API Response:', response.data);
       
       if (response.data.success) {
@@ -191,11 +211,11 @@ const PastOrders = () => {
     const dateStr = parts[1]; // YYYYMMDD
     const orderNum = parts[2]; // NUMBER
     
-    // Format date as YYYY/MM/DD
+    // Format date as DD/MM/YYYY
     const year = dateStr.substring(0, 4);
     const month = dateStr.substring(4, 6);
     const day = dateStr.substring(6, 8);
-    const formattedDate = `${year}/${month}/${day}`;
+    const formattedDate = `${day}/${month}/${year}`;
     
     return `${orderNum} | ${formattedDate}`;
   };
@@ -217,11 +237,7 @@ const PastOrders = () => {
       daysRemaining: Math.abs(daysRemaining),
       isExpired,
       isExpiringSoon,
-      formattedExpiry: expiryDate.toLocaleDateString('en-GB', { 
-        day: '2-digit', 
-        month: 'short', 
-        year: 'numeric' 
-      })
+      formattedExpiry: formatDate(expiryDate)
     };
   };
 
@@ -293,7 +309,7 @@ const PastOrders = () => {
     {
       title: 'Filtered Orders Revenue',
       value: filteredOrders.length > 0
-        ? formatCurrency(filteredOrders.reduce((sum, order) => sum + (order.total || 0), 0))
+        ? formatCurrency(filteredOrders.reduce((sum, order) => sum + (order.finalTotal || order.total || 0), 0))
         : formatCurrency(0),
       icon: CalculatorIcon,
       gradient: 'from-orange-500 to-orange-600'
@@ -301,7 +317,7 @@ const PastOrders = () => {
     {
       title: 'Total Revenue This Year',
       value: thisYearOrders.length > 0
-        ? formatCurrency(thisYearOrders.reduce((sum, order) => sum + (order.total || 0), 0))
+        ? formatCurrency(thisYearOrders.reduce((sum, order) => sum + (order.finalTotal || order.total || 0), 0))
         : formatCurrency(0),
       icon: CurrencyDollarIcon,
       gradient: 'from-green-500 to-green-600'
@@ -421,7 +437,7 @@ const PastOrders = () => {
         
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <div className="animate-spin-fast rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             <span className="ml-3 text-slate-600">Loading orders...</span>
           </div>
         ) : filteredOrders.length === 0 ? (
@@ -452,13 +468,13 @@ const PastOrders = () => {
                             <div className="flex items-center space-x-2">
                               <CalendarDaysIcon className="w-4 h-4 text-slate-400" />
                               <span className="text-sm text-slate-600">
-                                {new Date(order.createdAt).toLocaleDateString()} at {new Date(order.createdAt).toLocaleTimeString()}
+                                {formatDateTime(order.createdAt)}
                               </span>
                             </div>
                             <div className="flex items-center space-x-2">
                               <CurrencyDollarIcon className="w-4 h-4 text-slate-400" />
                               <span className="text-sm font-medium text-slate-900">
-                                {formatCurrency(order.total)}
+                                {formatCurrency(order.finalTotal || order.total)}
                               </span>
                             </div>
                           </div>
@@ -650,7 +666,7 @@ const PastOrders = () => {
                                     <div className="flex items-center justify-between text-xs text-red-600">
                                       <div className="flex items-center">
                                         <ClockIcon className="w-3 h-3 mr-1" />
-                                        <span>Fully Returned on {new Date(item.returnedAt).toLocaleDateString()}</span>
+                                        <span>Fully Returned on {formatDate(item.returnedAt)}</span>
                                       </div>
                                       <span className="font-semibold">{item.returnedQuantity || item.quantity} units</span>
                                     </div>
@@ -680,19 +696,33 @@ const PastOrders = () => {
                             )}
                             
                             <div className="border-t border-slate-200 pt-2 space-y-1">
-                              <div className="flex justify-between text-sm">
-                                <span>Subtotal:</span>
+                              <div className="flex justify-between text-sm text-slate-600">
+                                <span>Subtotal (Machine Prices):</span>
                                 <span>{formatCurrency(order.subtotal || 0)}</span>
                               </div>
+                              <div className="flex justify-between text-sm text-blue-600">
+                                <span>Total VAT:</span>
+                                <span>{formatCurrency(order.vatAmount || 0)}</span>
+                              </div>
+                              <div className="flex justify-between text-sm font-medium text-slate-700">
+                                <span>Total Before Discount:</span>
+                                <span>{formatCurrency(order.totalBeforeDiscount || (order.subtotal + (order.vatAmount || 0)))}</span>
+                              </div>
+                              {order.discountPercentage > 0 && (
+                                <div className="flex justify-between text-sm text-green-600">
+                                  <span>Discount ({order.discountPercentage}%):</span>
+                                  <span>-{formatCurrency(order.discountAmount || 0)}</span>
+                                </div>
+                              )}
                               {order.extrasTotal > 0 && (
-                                <div className="flex justify-between text-sm">
-                                  <span>Extras:</span>
+                                <div className="flex justify-between text-sm text-slate-600">
+                                  <span>Extra Charges:</span>
                                   <span>{formatCurrency(order.extrasTotal)}</span>
                                 </div>
                               )}
-                              <div className="flex justify-between font-medium text-base border-t border-slate-300 pt-1">
-                                <span>Total:</span>
-                                <span>{formatCurrency(order.total)}</span>
+                              <div className="flex justify-between font-bold text-base border-t border-slate-300 pt-1">
+                                <span>Final Total:</span>
+                                <span className="text-green-600">{formatCurrency(order.finalTotal || order.total)}</span>
                               </div>
                             </div>
                           </div>
@@ -810,11 +840,11 @@ const PastOrders = () => {
                     {selectedOrder.paymentStatus}
                   </span>
                   <span className="text-slate-600">
-                    {new Date(selectedOrder.createdAt).toLocaleString()}
+                    {formatDateTime(selectedOrder.createdAt)}
                   </span>
                 </div>
                 <span className="text-lg font-bold text-slate-900">
-                  {formatCurrency(selectedOrder.total)}
+                  {formatCurrency(selectedOrder.finalTotal || selectedOrder.total)}
                 </span>
               </div>
               
@@ -977,7 +1007,7 @@ const PastOrders = () => {
                         <div className="mt-4 pt-4 border-t border-red-200">
                           <div className="flex items-center text-sm text-red-600">
                             <ClockIcon className="w-4 h-4 mr-2" />
-                            <span>Returned on {new Date(item.returnedAt).toLocaleDateString()} at {new Date(item.returnedAt).toLocaleTimeString()}</span>
+                            <span>Returned on {formatDateTime(item.returnedAt)}</span>
                           </div>
                         </div>
                       )}
@@ -1008,19 +1038,35 @@ const PastOrders = () => {
                   {/* Total */}
                   <div className="pt-3 border-t border-slate-300">
                     <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span>Subtotal:</span>
+                      <div className="flex justify-between text-sm text-slate-600">
+                        <span>Subtotal (Machine Prices):</span>
                         <span>{formatCurrency(selectedOrder.subtotal || 0)}</span>
                       </div>
+                      <div className="flex justify-between text-sm text-blue-600">
+                        <span>Total VAT:</span>
+                        <span>{formatCurrency(selectedOrder.vatAmount || 0)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm font-medium text-slate-700">
+                        <span>Total Before Discount:</span>
+                        <span>{formatCurrency(selectedOrder.totalBeforeDiscount || (selectedOrder.subtotal + (selectedOrder.vatAmount || 0)))}</span>
+                      </div>
+                      {selectedOrder.discountPercentage > 0 && (
+                        <div className="flex justify-between text-sm text-green-600">
+                          <span>Discount ({selectedOrder.discountPercentage}%):</span>
+                          <span>-{formatCurrency(selectedOrder.discountAmount || 0)}</span>
+                        </div>
+                      )}
                       {selectedOrder.extrasTotal > 0 && (
-                        <div className="flex justify-between text-sm">
-                          <span>Extras:</span>
+                        <div className="flex justify-between text-sm text-slate-600">
+                          <span>Extra Charges:</span>
                           <span>{formatCurrency(selectedOrder.extrasTotal)}</span>
                         </div>
                       )}
-                      <div className="flex justify-between items-center text-lg font-bold border-t border-slate-300 pt-2">
-                        <span>Total Amount:</span>
-                        <span>{formatCurrency(selectedOrder.total)}</span>
+                    </div>
+                    <div className="border-t border-slate-300 pt-2">
+                      <div className="flex justify-between items-center text-xl font-bold text-slate-800">
+                        <span>Final Total:</span>
+                        <span className="text-green-600">{formatCurrency(selectedOrder.finalTotal || selectedOrder.total)}</span>
                       </div>
                     </div>
                   </div>

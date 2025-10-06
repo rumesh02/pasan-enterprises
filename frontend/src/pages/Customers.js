@@ -17,6 +17,15 @@ import {
 import { customerAPI, handleApiError } from '../services/apiService';
 
 const Customers = () => {
+  // Helper function to format dates as DD/MM/YYYY
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  };
+
   const [customers, setCustomers] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
@@ -41,7 +50,7 @@ const Customers = () => {
     try {
       setLoading(true);
       setError('');
-      const response = await customerAPI.getAll();
+      const response = await customerAPI.getAll({ limit: 1000 }); // Request a high limit to get all customers
       console.log('API Response:', response.data);
       
       if (response.data.success) {
@@ -232,7 +241,7 @@ const Customers = () => {
         
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <div className="animate-spin-fast rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             <span className="ml-3 text-slate-600">Loading customers...</span>
           </div>
         ) : filteredCustomers.length === 0 ? (
@@ -305,7 +314,7 @@ const Customers = () => {
                         </span>
                         {customer.lastOrderDate && (
                           <p className="text-xs text-slate-500">
-                            Last order: {new Date(customer.lastOrderDate).toLocaleDateString()}
+                            Last order: {formatDate(customer.lastOrderDate)}
                           </p>
                         )}
                       </div>
