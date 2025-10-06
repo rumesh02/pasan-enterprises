@@ -64,10 +64,10 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`🌐 API available at: http://localhost:${PORT}`);
+// Start HTTP server (plain, Nginx will handle HTTPS)
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`✅ Node server running on port ${PORT}`);
+  console.log(`🌐 API available at http://localhost:${PORT}`);
   console.log(`📚 Health check: http://localhost:${PORT}/health`);
 });
 
