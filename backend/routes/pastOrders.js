@@ -7,7 +7,9 @@ const {
   updateOrderStatus,
   getOrderStats,
   getOrdersByDateRange,
-  deleteOrder
+  deleteOrder,
+  returnItem,
+  updateOrder
 } = require('../controllers/ordersController');
 
 // @route   GET /api/past-orders/stats
@@ -39,6 +41,16 @@ router.get('/:id', getOrderById);
 // @desc    Update order status
 // @access  Public
 router.patch('/:id/status', updateOrderStatus);
+
+// @route   PUT /api/past-orders/return-item/:orderId
+// @desc    Return an item from an order
+// @access  Public
+router.put('/return-item/:orderId', returnItem);
+
+// @route   PUT /api/past-orders/:orderId
+// @desc    Update/Edit an order
+// @access  Public
+router.put('/:orderId', updateOrder);
 
 // @route   DELETE /api/past-orders/:id
 // @desc    Cancel order (soft delete)

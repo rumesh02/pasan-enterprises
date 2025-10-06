@@ -129,6 +129,12 @@ export const pastOrdersAPI = {
   
   // Cancel order
   cancel: (id) => api.delete(`/past-orders/${id}`),
+  
+  // Return item from order
+  returnItem: (orderId, data) => api.put(`/past-orders/return-item/${orderId}`, data),
+  
+  // Update/Edit order
+  update: (orderId, data) => api.put(`/past-orders/${orderId}`, data),
 };
 
 // User API

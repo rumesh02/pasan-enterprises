@@ -59,6 +59,19 @@ const orderItemSchema = new mongoose.Schema({
     type: Number,
     default: 0,
     min: [0, 'Total with VAT cannot be negative']
+  },
+  // Return tracking
+  returned: {
+    type: Boolean,
+    default: false
+  },
+  returnedQuantity: {
+    type: Number,
+    default: 0,
+    min: [0, 'Returned quantity cannot be negative']
+  },
+  returnedAt: {
+    type: Date
   }
 }, { _id: false }); // Don't create separate _id for sub-documents
 
