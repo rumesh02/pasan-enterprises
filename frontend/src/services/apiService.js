@@ -1,8 +1,18 @@
 import axios from 'axios';
 
+// Determine the API base URL based on environment
+const getBaseURL = () => {
+  // Check if running on localhost (development)
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    return 'http://localhost:5000/api';
+  }
+  // Production URL
+  return 'https://pasan-enterprises.me/api';
+};
+
 // Create axios instance with base configuration
 const api = axios.create({
-  baseURL: 'https://pasan-enterprises.me/api',
+  baseURL: getBaseURL(),
   headers: {
     'Content-Type': 'application/json',
   },

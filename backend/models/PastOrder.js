@@ -30,10 +30,35 @@ const orderItemSchema = new mongoose.Schema({
     required: true,
     min: [0, 'Unit price cannot be negative']
   },
+  // Per-item VAT percentage (default 18%)
+  vatPercentage: {
+    type: Number,
+    default: 18,
+    min: [0, 'VAT percentage cannot be negative'],
+    max: [100, 'VAT percentage cannot exceed 100']
+  },
+  // Per-item VAT amount
+  vatAmount: {
+    type: Number,
+    default: 0,
+    min: [0, 'VAT amount cannot be negative']
+  },
+  // Warranty in months (default 12 months)
+  warrantyMonths: {
+    type: Number,
+    default: 12,
+    min: [0, 'Warranty months cannot be negative']
+  },
   subtotal: {
     type: Number,
     required: true,
     min: [0, 'Subtotal cannot be negative']
+  },
+  // Total price including VAT for this item
+  totalWithVAT: {
+    type: Number,
+    default: 0,
+    min: [0, 'Total with VAT cannot be negative']
   }
 }, { _id: false }); // Don't create separate _id for sub-documents
 
@@ -176,11 +201,30 @@ pastOrderSchema.index({ 'customerInfo.name': 'text' });
 
 // Pre-save middleware to calculate totals
 pastOrderSchema.pre('save', function(next) {
-  // Calculate subtotal from items
+  // Calculate per-item VAT and totals
+  this.items.forEach(item => {
+    // The unitPrice stored already includes VAT
+    // Calculate VAT amount: VAT = (VAT% / 100) × Unit Price
+    const vatAmountPerUnit = (item.vatPercentage / 100) * item.unitPrice;
+    
+    // Calculate base price: Base Price = Unit Price - VAT
+    const basePricePerUnit = item.unitPrice - vatAmountPerUnit;
+    
+    // Calculate subtotal for this item (base price × quantity, without VAT)
+    item.subtotal = basePricePerUnit * item.quantity;
+    
+    // Calculate total VAT amount for this item
+    item.vatAmount = vatAmountPerUnit * item.quantity;
+    
+    // Total with VAT is simply unitPrice × quantity
+    item.totalWithVAT = item.unitPrice * item.quantity;
+  });
+  
+  // Calculate subtotal from items (base prices only, no VAT)
   this.subtotal = this.items.reduce((sum, item) => sum + item.subtotal, 0);
   
-  // Calculate VAT
-  this.vatAmount = (this.subtotal * this.vatRate) / 100;
+  // Calculate total VAT from all items
+  this.vatAmount = this.items.reduce((sum, item) => sum + item.vatAmount, 0);
   
   // Calculate total before discount (subtotal + VAT)
   this.totalBeforeDiscount = this.subtotal + this.vatAmount;
@@ -198,8 +242,8 @@ pastOrderSchema.pre('save', function(next) {
   this.finalTotal = this.totalBeforeDiscount - this.discountAmount + this.extrasTotal;
   
   console.log(`💰 Order totals calculated:`);
-  console.log(`   Subtotal: ${this.subtotal}`);
-  console.log(`   VAT (${this.vatRate}%): ${this.vatAmount}`);
+  console.log(`   Subtotal (Base Prices): ${this.subtotal}`);
+  console.log(`   Total VAT: ${this.vatAmount}`);
   console.log(`   Total Before Discount: ${this.totalBeforeDiscount}`);
   console.log(`   Discount (${this.discountPercentage}%): ${this.discountAmount}`);
   console.log(`   Extras: ${this.extrasTotal}`);

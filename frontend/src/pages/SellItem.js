@@ -8,7 +8,6 @@ import {
   CheckCircleIcon,
   ExclamationTriangleIcon,
   XMarkIcon,
-  CalculatorIcon,
   ReceiptPercentIcon,
   DocumentArrowDownIcon
 } from '@heroicons/react/24/outline';
@@ -40,8 +39,8 @@ const SellItem = () => {
   const [totalMachines, setTotalMachines] = useState(0);
   const itemsPerPage = 3;
   
-  // VAT and Discount states
-  const [vatRate, setVatRate] = useState(15); // 15% VAT
+  // VAT is now handled per-item in cart, this is kept for reference only
+  const vatRate = 15; // Default reference VAT rate
   const [discountPercentage, setDiscountPercentage] = useState(0);
 
   const fetchMachines = useCallback(async (page = currentPage, category = selectedCategory, search = searchTerm) => {
@@ -133,6 +132,8 @@ const SellItem = () => {
         category: machine.category,
         unitPrice: machine.price,
         quantity: 1,
+        vatPercentage: 18, // Default 18% VAT per item
+        warrantyMonths: 12, // Default 12 months warranty
         availableStock: machine.quantity
       }]);
     }
@@ -160,6 +161,55 @@ const SellItem = () => {
     setCart(cart.filter(item => item.machineId !== machineId));
   };
 
+  // Update VAT percentage for individual cart item
+  const updateCartItemVAT = (machineId, vatPercentage) => {
+    const newVat = parseFloat(vatPercentage) || 0;
+    if (newVat < 0 || newVat > 100) {
+      setError('VAT percentage must be between 0 and 100');
+      setTimeout(() => setError(''), 3000);
+      return;
+    }
+    setCart(cart.map(item =>
+      item.machineId === machineId
+        ? { ...item, vatPercentage: newVat }
+        : item
+    ));
+  };
+
+  // Update warranty months for individual cart item
+  const updateCartItemWarranty = (machineId, warrantyMonths) => {
+    const newWarranty = parseInt(warrantyMonths) || 0;
+    if (newWarranty < 0) {
+      setError('Warranty months cannot be negative');
+      setTimeout(() => setError(''), 3000);
+      return;
+    }
+    setCart(cart.map(item =>
+      item.machineId === machineId
+        ? { ...item, warrantyMonths: newWarranty }
+        : item
+    ));
+  };
+
+  // Calculate base price (price without VAT) for a cart item
+  const getItemBasePriceWithoutVAT = (item) => {
+    // Base price = Total Price - (VAT% × Total Price)
+    // Base price = Total Price × (1 - VAT%)
+    const vatAmount = (item.vatPercentage / 100) * item.unitPrice;
+    return item.unitPrice - vatAmount;
+  };
+
+  // Calculate VAT amount for a specific cart item
+  const getItemVATAmount = (item) => {
+    // VAT = (VAT% / 100) × Unit Price × Quantity
+    return (item.vatPercentage / 100) * item.unitPrice * item.quantity;
+  };
+
+  // Calculate total with VAT for a specific cart item (this is just unitPrice * quantity)
+  const getItemTotalWithVAT = (item) => {
+    return item.unitPrice * item.quantity;
+  };
+
   const addExtra = () => {
     setExtras([...extras, { description: '', amount: 0 }]);
   };
@@ -177,12 +227,17 @@ const SellItem = () => {
     setExtras(extras.filter((_, i) => i !== index));
   };
 
+  // Calculate subtotal (machine prices without VAT)
   const getSubtotal = () => {
-    return cart.reduce((total, item) => total + (item.unitPrice * item.quantity), 0);
+    return cart.reduce((total, item) => {
+      const basePriceWithoutVAT = getItemBasePriceWithoutVAT(item);
+      return total + (basePriceWithoutVAT * item.quantity);
+    }, 0);
   };
 
+  // Calculate total VAT from all items (extracted from prices)
   const getVATAmount = () => {
-    return (getSubtotal() * vatRate) / 100;
+    return cart.reduce((total, item) => total + getItemVATAmount(item), 0);
   };
 
   const getTotalBeforeDiscount = () => {
@@ -232,7 +287,11 @@ const SellItem = () => {
           machineId: item.machineId,
           name: item.name,
           quantity: item.quantity,
-          unitPrice: item.unitPrice
+          unitPrice: item.unitPrice,
+          vatPercentage: item.vatPercentage,
+          vatAmount: getItemVATAmount(item),
+          warrantyMonths: item.warrantyMonths,
+          totalWithVAT: getItemTotalWithVAT(item)
         })),
         cart: cart,
         extras: extras.filter(extra => extra.description && extra.amount > 0),
@@ -269,7 +328,9 @@ const SellItem = () => {
         customerInfo,
         items: cart.map(item => ({
           machineId: item.machineId,
-          quantity: item.quantity
+          quantity: item.quantity,
+          vatPercentage: item.vatPercentage,
+          warrantyMonths: item.warrantyMonths
         })),
         extras: extras.filter(extra => extra.description && extra.amount > 0)
       };
@@ -357,10 +418,12 @@ const SellItem = () => {
         },
         items: cart.map(item => ({
           machineId: item.machineId,
-          quantity: item.quantity
+          quantity: item.quantity,
+          vatPercentage: item.vatPercentage,
+          warrantyMonths: item.warrantyMonths
         })),
         extras: extras.filter(extra => extra.description && extra.amount > 0),
-        vatRate: vatRate,
+        vatRate: vatRate, // Keep for reference
         discountPercentage: discountPercentage,
         notes: '',
         processedBy: 'Admin'
@@ -381,7 +444,11 @@ const SellItem = () => {
               machineId: item.machineId,
               name: item.name,
               quantity: item.quantity,
-              unitPrice: item.unitPrice
+              unitPrice: item.unitPrice,
+              vatPercentage: item.vatPercentage,
+              vatAmount: getItemVATAmount(item),
+              warrantyMonths: item.warrantyMonths,
+              totalWithVAT: getItemTotalWithVAT(item)
             })),
             cart: cart, // Include full cart data for invoice generation
             extras: extras.filter(extra => extra.description && extra.amount > 0),
@@ -625,8 +692,8 @@ const SellItem = () => {
                 ) : (
                   <div className="space-y-4">
                     {cart.map((item) => (
-                      <div key={item.machineId} className="border border-slate-200 rounded-lg p-3 bg-white/50">
-                        <div className="flex justify-between items-start mb-2">
+                      <div key={item.machineId} className="border border-slate-200 rounded-lg p-4 bg-white/50">
+                        <div className="flex justify-between items-start mb-3">
                           <div>
                             <h5 className="font-medium text-slate-800 text-sm">{item.name}</h5>
                             <p className="text-xs text-slate-600">ID: {item.itemId}</p>
@@ -638,7 +705,9 @@ const SellItem = () => {
                             <XMarkIcon className="w-4 h-4" />
                           </button>
                         </div>
-                        <div className="flex items-center justify-between">
+                        
+                        {/* Quantity Controls */}
+                        <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center space-x-2">
                             <button
                               onClick={() => updateCartQuantity(item.machineId, -1)}
@@ -646,7 +715,7 @@ const SellItem = () => {
                             >
                               <MinusIcon className="w-3 h-3" />
                             </button>
-                            <span className="text-sm font-medium">{item.quantity}</span>
+                            <span className="text-sm font-medium">Qty: {item.quantity}</span>
                             <button
                               onClick={() => updateCartQuantity(item.machineId, 1)}
                               className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center hover:bg-slate-300"
@@ -654,9 +723,54 @@ const SellItem = () => {
                               <PlusIcon className="w-3 h-3" />
                             </button>
                           </div>
-                          <span className="text-sm font-bold text-slate-800">
-                            Rs. {(item.unitPrice * item.quantity).toFixed(2)}
-                          </span>
+                          <span className="text-xs text-slate-500">Stock: {item.availableStock}</span>
+                        </div>
+
+                        {/* Price Breakdown */}
+                        <div className="space-y-2 mb-3 bg-slate-50 p-2 rounded">
+                          <div className="flex justify-between text-xs">
+                            <span className="text-slate-600">Unit Price (incl. VAT):</span>
+                            <span className="font-medium">Rs. {item.unitPrice.toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between text-xs">
+                            <span className="text-slate-600">Machine Price ({item.quantity}x):</span>
+                            <span className="font-medium">Rs. {(getItemBasePriceWithoutVAT(item) * item.quantity).toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between text-xs">
+                            <span className="text-slate-600">VAT ({item.vatPercentage}%):</span>
+                            <span className="font-medium text-blue-600">Rs. {getItemVATAmount(item).toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between text-xs font-bold border-t border-slate-200 pt-2">
+                            <span className="text-slate-700">Total with VAT:</span>
+                            <span className="text-green-600">Rs. {getItemTotalWithVAT(item).toFixed(2)}</span>
+                          </div>
+                        </div>
+
+                        {/* Editable VAT and Warranty */}
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-xs font-medium text-slate-700 mb-1">VAT %</label>
+                            <input
+                              type="number"
+                              min="0"
+                              max="100"
+                              step="0.1"
+                              value={item.vatPercentage}
+                              onChange={(e) => updateCartItemVAT(item.machineId, e.target.value)}
+                              className="w-full px-2 py-1 text-xs border border-slate-300 rounded focus:ring-1 focus:ring-blue-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-slate-700 mb-1">Warranty (months)</label>
+                            <input
+                              type="number"
+                              min="0"
+                              step="1"
+                              value={item.warrantyMonths}
+                              onChange={(e) => updateCartItemWarranty(item.machineId, e.target.value)}
+                              className="w-full px-2 py-1 text-xs border border-slate-300 rounded focus:ring-1 focus:ring-blue-500"
+                            />
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -665,11 +779,11 @@ const SellItem = () => {
                     <div className="border-t border-slate-200 pt-4 space-y-3">
                       <div className="space-y-2">
                         <div className="flex justify-between text-sm text-slate-600">
-                          <span>Subtotal (Items):</span>
+                          <span>Subtotal (Machine Prices):</span>
                           <span>Rs. {getSubtotal().toFixed(2)}</span>
                         </div>
-                        <div className="flex justify-between text-sm text-slate-600">
-                          <span>VAT ({vatRate}%):</span>
+                        <div className="flex justify-between text-sm text-blue-600">
+                          <span>Total VAT (Per-Item):</span>
                           <span>Rs. {getVATAmount().toFixed(2)}</span>
                         </div>
                         <div className="flex justify-between text-sm font-medium text-slate-700">
@@ -700,39 +814,25 @@ const SellItem = () => {
                 )}
               </div>
 
-            {/* VAT and Discount */}
+            {/* Discount */}
             <div className="bg-white/60 backdrop-blur-sm rounded-2xl shadow-xl border border-slate-200/50 p-6">
               <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center">
-                <CalculatorIcon className="w-5 h-5 mr-2" />
-                VAT & Discount
+                <ReceiptPercentIcon className="w-5 h-5 mr-2" />
+                Discount
               </h3>
               
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">VAT Rate (%)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.1"
-                    value={vatRate}
-                    onChange={(e) => setVatRate(parseFloat(e.target.value) || 0)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/50 text-sm"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Discount (%)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.1"
-                    value={discountPercentage}
-                    onChange={(e) => setDiscountPercentage(parseFloat(e.target.value) || 0)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/50 text-sm"
-                  />
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Discount (%)</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  value={discountPercentage}
+                  onChange={(e) => setDiscountPercentage(parseFloat(e.target.value) || 0)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/50 text-sm"
+                  placeholder="Enter discount percentage"
+                />
               </div>
             </div>
 
