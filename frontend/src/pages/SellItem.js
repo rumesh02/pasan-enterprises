@@ -527,7 +527,10 @@ const SellItem = () => {
                     <div key={machine._id} className="border border-slate-200 rounded-lg p-3 hover:shadow-md transition-all duration-200 bg-white/50">
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
-                          <h4 className="font-semibold text-slate-800 mb-1 text-sm">{machine.name}</h4>
+                          <div className="flex items-center gap-2 mb-1">
+                            <h4 className="font-semibold text-slate-800 text-sm">{machine.name}</h4>
+                            <span className="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded">ID: {machine.itemId}</span>
+                          </div>
                           <div className="flex items-center justify-between">
                             <span className="text-base font-bold text-slate-800">Rs. {machine.price.toFixed(2)}</span>
                             <span className={`text-xs px-2 py-1 rounded-full ${
