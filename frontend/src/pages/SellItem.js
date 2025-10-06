@@ -160,7 +160,8 @@ const SellItem = () => {
       name: customer.name,
       email: customer.email || '',
       phone: customer.phone || '',
-      nic: customer.nic || ''
+      nic: customer.nic || '',
+      address: customer.address || ''
     });
     setShowCustomerDropdown(false);
     setCustomerSearchResults([]);
