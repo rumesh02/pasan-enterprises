@@ -130,6 +130,10 @@ const pastOrderSchema = new mongoose.Schema({
       type: String,
       trim: true,
       uppercase: true
+    },
+    address: {
+      type: String,
+      trim: true
     }
   },
   items: [orderItemSchema],

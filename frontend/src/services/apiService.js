@@ -127,6 +127,9 @@ export const pastOrdersAPI = {
   // Get orders by date range
   getByDateRange: (params) => api.get('/past-orders/range', { params }),
   
+  // Get machine sales statistics
+  getMachineSalesStats: (machineId) => api.get(`/past-orders/machine-stats/${machineId}`),
+  
   // Cancel order
   cancel: (id) => api.delete(`/past-orders/${id}`),
   
