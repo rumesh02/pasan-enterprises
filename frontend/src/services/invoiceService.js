@@ -180,6 +180,15 @@ export const generateInvoice = async (saleData, orderData) => {
     doc.text(`Invoice Number: ${orderData.orderId}`, pageWidth - 15, yPosition, { align: 'right' });
     yPosition += 6;
     
+    // Add customer address below buyer name if address exists
+    if (saleData.customerInfo.address && saleData.customerInfo.address.trim()) {
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Address: ${saleData.customerInfo.address}`, 15, yPosition);
+      yPosition += 6;
+      doc.setFontSize(10); // Reset font size
+    }
+    
     doc.text(`Date: ${invoiceDate}`, 15, yPosition);
     doc.text(`Time: ${invoiceTime}`, pageWidth - 15, yPosition, { align: 'right' });
     yPosition += 15;
