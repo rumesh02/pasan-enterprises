@@ -92,9 +92,9 @@ const Login = ({ onLogin }) => {
               <img 
                 src="/images/logo2.png" 
                 alt="Pasan Enterprises" 
-                className="h-24 w-auto mx-auto mb-6"
+                className="h-36 w-auto mx-auto mb-12"
               />
-              <h1 className="text-4xl font-bold mb-4">Pasan Enterprises (PVT) LTD</h1>
+              <h1 className="text-4xl font-bold mb-4">P.E. INDUSTRIAL AUTOMATION (PVT) LTD</h1>
               <p className="text-xl text-center text-blue-100">Inventory Management System</p>
             </div>
             <div className="max-w-lg text-center">
@@ -112,9 +112,9 @@ const Login = ({ onLogin }) => {
               <img 
                 src="/images/logo2.png" 
                 alt="Pasan Enterprises" 
-                className="h-20 w-auto mx-auto mb-4"
+                className="h-28 w-auto mx-auto mb-6"
               />
-              <h1 className="text-3xl font-bold text-gray-900">Pasan Enterprises</h1>
+              <h1 className="text-3xl font-bold text-gray-900">P.E. INDUSTRIAL AUTOMATION (PVT). LTD</h1>
               <p className="text-gray-600 text-lg">Inventory Management System</p>
             </div>
 
