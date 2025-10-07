@@ -45,11 +45,13 @@ Your backend will be available at: `https://your-app-name.onrender.com`
 4. **Environment Variables** (Add these in Vercel dashboard):
 
    ```
-   REACT_APP_API_URL=https://your-render-app.onrender.com/api
+   REACT_APP_API_URL=https://pasan-enterprises.onrender.com/api
    REACT_APP_NAME=Pasan Enterprises
    REACT_APP_VERSION=1.0.0
    REACT_APP_NODE_ENV=production
    ```
+
+   **Important**: Make sure to add `/api` at the end of your backend URL!
 
 5. **Deploy**: Click "Deploy"
 
