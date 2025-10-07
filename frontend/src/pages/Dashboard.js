@@ -1,297 +1,249 @@
 import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import { 
-  ChartBarIcon, 
   CurrencyDollarIcon, 
-  CalendarDaysIcon,
-  UsersIcon,
-  CogIcon,
-  ArrowUpIcon,
-  ArrowDownIcon
+  ShoppingCartIcon,
+  ExclamationTriangleIcon,
+  ChartBarIcon
 } from '@heroicons/react/24/outline';
-import { dashboardAPI, handleApiError } from '../services/apiService';
 
 const Dashboard = () => {
-  const [dashboardStats, setDashboardStats] = useState(null);
-  const [monthlyRevenue, setMonthlyRevenue] = useState([]);
+  const [monthlyRevenue, setMonthlyRevenue] = useState(null);
+  const [totalOrders, setTotalOrders] = useState(null);
+  const [lowStock, setLowStock] = useState(null);
+  const [totalItems, setTotalItems] = useState(null);
+  const [monthlyGraph, setMonthlyGraph] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
-  // Fetch dashboard data
+
+  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+
+  // Fetch all dashboard data
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
         setLoading(true);
         setError(null);
 
-        // Fetch dashboard stats and monthly revenue in parallel
-        const [statsResponse, revenueResponse] = await Promise.all([
-          dashboardAPI.getStats(),
-          dashboardAPI.getMonthlyRevenue()
+        // Fetch all endpoints in parallel
+        const [
+          monthlyRevenueRes,
+          totalOrdersRes,
+          lowStockRes,
+          totalItemsRes,
+          monthlyGraphRes
+        ] = await Promise.all([
+          axios.get(`${API_URL}/dashboard/monthly-revenue`),
+          axios.get(`${API_URL}/dashboard/total-orders`),
+          axios.get(`${API_URL}/dashboard/low-stock`),
+          axios.get(`${API_URL}/dashboard/total-items`),
+          axios.get(`${API_URL}/dashboard/monthly-graph`)
         ]);
 
-        if (statsResponse.data.success) {
-          setDashboardStats(statsResponse.data.data);
+        // Set state for each metric
+        if (monthlyRevenueRes.data.success) {
+          setMonthlyRevenue(monthlyRevenueRes.data.data);
         }
-
-        if (revenueResponse.data.success) {
-          setMonthlyRevenue(revenueResponse.data.data);
+        if (totalOrdersRes.data.success) {
+          setTotalOrders(totalOrdersRes.data.data);
+        }
+        if (lowStockRes.data.success) {
+          setLowStock(lowStockRes.data.data);
+        }
+        if (totalItemsRes.data.success) {
+          setTotalItems(totalItemsRes.data.data);
+        }
+        if (monthlyGraphRes.data.success) {
+          setMonthlyGraph(monthlyGraphRes.data.data);
         }
 
       } catch (err) {
         console.error('Error fetching dashboard data:', err);
-        const errorInfo = handleApiError(err);
-        setError(errorInfo.message);
+        setError(err.response?.data?.message || 'Failed to fetch dashboard data');
       } finally {
         setLoading(false);
       }
     };
 
     fetchDashboardData();
-  }, []);
+  }, [API_URL]);
 
-  // Format currency
+  // Format currency as "LKR 123,456.78"
   const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-LK', {
-      style: 'currency',
-      currency: 'LKR',
-      minimumFractionDigits: 0
-    }).format(amount);
+    if (!amount && amount !== 0) return 'LKR 0.00';
+    return `LKR ${amount.toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    })}`;
   };
 
-  // Format large numbers
-  const formatNumber = (num) => {
-    if (num >= 1000000) {
-      return (num / 1000000).toFixed(1) + 'M';
-    } else if (num >= 1000) {
-      return (num / 1000).toFixed(1) + 'K';
-    }
-    return num.toString();
-  };
-
-  // Generate stats for top cards
-  const getTopCardStats = () => {
-    if (!dashboardStats) return [];
-
-    return [
-      {
-        title: 'Total Revenue This Year',
-        value: formatCurrency(dashboardStats.topCards.totalRevenueYear),
-        icon: CurrencyDollarIcon,
-        gradient: 'from-green-500 to-green-600'
-      },
-      {
-        title: 'Total Orders This Year',
-        value: dashboardStats.topCards.totalOrdersYear.toLocaleString(),
-        icon: ChartBarIcon,
-        gradient: 'from-blue-500 to-blue-600'
-      },
-      {
-        title: 'Total Machines',
-        value: dashboardStats.topCards.totalMachines.toLocaleString(),
-        icon: CogIcon,
-        gradient: 'from-purple-500 to-purple-600'
-      },
-      {
-        title: 'Total Customers',
-        value: dashboardStats.topCards.totalCustomers.toLocaleString(),
-        icon: UsersIcon,
-        gradient: 'from-orange-500 to-orange-600'
-      }
-    ];
-  };
-
-  // Get the maximum value for scaling the bar chart
-  const maxRevenue = monthlyRevenue.length > 0 
-    ? Math.max(...monthlyRevenue.map(item => item.revenue))
-    : 0;
-
+  // Loading state
   if (loading) {
     return (
-      <div className="p-8">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-8">
         <div className="flex items-center justify-center h-64">
-          <div className="animate-spin-fast rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-slate-600">Loading dashboard...</p>
+          </div>
         </div>
       </div>
     );
   }
 
+  // Error state
   if (error) {
     return (
-      <div className="p-8">
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-          <h3 className="font-bold">Error loading dashboard</h3>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-8">
+        <div className="bg-red-50 border border-red-200 text-red-700 px-6 py-4 rounded-lg">
+          <h3 className="font-bold text-lg mb-2">Error loading dashboard</h3>
           <p>{error}</p>
         </div>
       </div>
     );
   }
 
-  const topCardStats = getTopCardStats();
+  // Calculate max revenue for chart scaling
+  const maxRevenue = monthlyGraph.length > 0 
+    ? Math.max(...monthlyGraph.map(item => item.revenue))
+    : 0;
 
   return (
-    <div className="p-8">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-8">
+      {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent">
-          Dashboard
-        </h1>
-        <p className="text-slate-600 mt-2">Overview of your business management system</p>
+        <h1 className="text-3xl font-bold text-slate-800">Dashboard</h1>
+        <p className="text-slate-600 mt-2">Business overview and statistics</p>
       </div>
 
-      {/* Top Stats Cards */}
+      {/* Statistic Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        {topCardStats.map((stat, index) => {
-          const IconComponent = stat.icon;
-          return (
-            <div key={index} className="bg-white/60 backdrop-blur-sm rounded-2xl shadow-xl border border-slate-200/50 p-6 hover:shadow-2xl transition-all duration-300">
-              <div className="flex items-center justify-between mb-4">
-                <div className={`p-3 rounded-xl bg-gradient-to-r ${stat.gradient} shadow-lg`}>
-                  <IconComponent className="w-6 h-6 text-white" />
-                </div>
-              </div>
-              <h3 className="text-2xl font-bold text-slate-800 mb-2">{stat.value}</h3>
-              <p className="text-slate-600 text-sm">{stat.title}</p>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-        {/* This Month Orders Details */}
-        <div className="bg-white/60 backdrop-blur-sm rounded-2xl shadow-xl border border-slate-200/50 p-6">
-          <h3 className="text-xl font-bold text-slate-800 mb-2 flex items-center">
-            <CalendarDaysIcon className="w-6 h-6 mr-2 text-purple-600" />
-            This Month Overview
-          </h3>
-          <div className="mb-4">
-            <div className="text-2xl font-bold text-purple-700">
-              {new Date().toLocaleDateString('en-US', { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
-              })}
+        {/* Monthly Revenue Card */}
+        <div className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-shadow">
+          <div className="flex items-start justify-between mb-4">
+            <div className="p-3 rounded-xl bg-gradient-to-br from-green-500 to-green-600 shadow-md">
+              <CurrencyDollarIcon className="w-6 h-6 text-white" />
             </div>
           </div>
-          {dashboardStats && (
-            <div className="space-y-4">
-              <div className="bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg p-4">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm font-medium text-purple-700">Total Orders</span>
-                  <span className="text-2xl font-bold text-purple-800">
-                    {dashboardStats.thisMonth.totalOrders}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm font-medium text-purple-700">Revenue</span>
-                  <span className="text-lg font-semibold text-purple-800">
-                    {formatCurrency(dashboardStats.thisMonth.revenue)}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-purple-700">Growth</span>
-                  <div className="flex items-center">
-                    {dashboardStats.thisMonth.growth.revenue >= 0 ? (
-                      <ArrowUpIcon className="w-4 h-4 text-green-600 mr-1" />
-                    ) : (
-                      <ArrowDownIcon className="w-4 h-4 text-red-600 mr-1" />
-                    )}
-                    <span className={`text-sm font-bold ${
-                      dashboardStats.thisMonth.growth.revenue >= 0 ? 'text-green-600' : 'text-red-600'
-                    }`}>
-                      {Math.abs(dashboardStats.thisMonth.growth.revenue)}%
-                    </span>
+          <h3 className="text-3xl font-bold text-slate-800 mb-2 whitespace-nowrap">
+            {monthlyRevenue ? formatCurrency(monthlyRevenue.revenue) : 'LKR 0.00'}
+          </h3>
+          <p className="text-slate-600 text-sm font-medium">Monthly Revenue</p>
+          <p className="text-slate-500 text-xs mt-1">This month</p>
+        </div>
+
+        {/* Total Orders Card */}
+        <div className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-shadow">
+          <div className="flex items-start justify-between mb-4">
+            <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 shadow-md">
+              <ShoppingCartIcon className="w-6 h-6 text-white" />
+            </div>
+          </div>
+          <h3 className="text-3xl font-bold text-slate-800 mb-2 whitespace-nowrap">
+            {totalOrders ? formatCurrency(totalOrders.revenue) : 'LKR 0.00'}
+          </h3>
+          <p className="text-slate-600 text-sm font-medium">Total Orders</p>
+          <p className="text-slate-500 text-xs mt-1">All time revenue</p>
+        </div>
+
+        {/* Low Stock Items Card */}
+        <div className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-shadow">
+          <div className="flex items-start justify-between mb-4">
+            <div className="p-3 rounded-xl bg-gradient-to-br from-red-500 to-red-600 shadow-md">
+              <ExclamationTriangleIcon className="w-6 h-6 text-white" />
+            </div>
+          </div>
+          <h3 className="text-3xl font-bold text-slate-800 mb-2">
+            {lowStock ? lowStock.count : 0}
+          </h3>
+          <p className="text-slate-600 text-sm font-medium">Low Stock Items</p>
+          <p className="text-slate-500 text-xs mt-1">Items with qty &lt; 3</p>
+        </div>
+
+        {/* Total Items Card */}
+        <div className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-shadow">
+          <div className="flex items-start justify-between mb-4">
+            <div className="p-3 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 shadow-md">
+              <ChartBarIcon className="w-6 h-6 text-white" />
+            </div>
+          </div>
+          <h3 className="text-3xl font-bold text-slate-800 mb-2">
+            {totalItems ? totalItems.count : 0}
+          </h3>
+          <p className="text-slate-600 text-sm font-medium">Total Items</p>
+          <p className="text-slate-500 text-xs mt-1">In inventory</p>
+        </div>
+      </div>
+
+      {/* Monthly Revenue Chart */}
+      <div className="bg-white rounded-2xl shadow-lg p-6">
+        <div className="flex items-center mb-6">
+          <ChartBarIcon className="w-6 h-6 text-blue-600 mr-2" />
+          <h2 className="text-xl font-bold text-slate-800">
+            Monthly Revenue Overview (2025)
+          </h2>
+        </div>
+
+        {/* Chart Legend */}
+        <div className="flex items-center justify-end mb-4">
+          <div className="flex items-center">
+            <div className="w-4 h-4 bg-blue-500 rounded mr-2"></div>
+            <span className="text-sm text-slate-600">Monthly Revenue</span>
+          </div>
+        </div>
+
+        {/* Bar Chart */}
+        <div className="relative">
+          {monthlyGraph.length === 0 ? (
+            <div className="flex items-center justify-center h-64 bg-slate-50 rounded-lg">
+              <p className="text-slate-500">No data available</p>
+            </div>
+          ) : (
+            <div className="flex items-end justify-between h-64 bg-gradient-to-t from-slate-50 to-transparent rounded-lg p-4">
+              {monthlyGraph.map((data, index) => {
+                // Calculate bar height (percentage of max)
+                const heightPercentage = maxRevenue > 0 ? (data.revenue / maxRevenue) * 100 : 0;
+                const displayHeight = data.revenue > 0 ? Math.max(heightPercentage, 5) : 2;
+
+                return (
+                  <div key={index} className="flex flex-col items-center flex-1 group">
+                    {/* Bar Container */}
+                    <div className="relative flex items-end mb-2" style={{ height: '200px' }}>
+                      <div
+                        className={`w-8 rounded-t transition-all duration-300 group-hover:opacity-80 ${
+                          data.revenue === 0 
+                            ? 'bg-slate-200' 
+                            : 'bg-gradient-to-t from-blue-500 to-blue-400'
+                        }`}
+                        style={{ height: `${displayHeight}%` }}
+                        title={`${data.month}: ${formatCurrency(data.revenue)}`}
+                      >
+                        {/* Tooltip on hover */}
+                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10 pointer-events-none">
+                          <div className="bg-slate-800 text-white text-xs rounded py-2 px-3 whitespace-nowrap shadow-lg">
+                            <div className="font-semibold">{formatCurrency(data.revenue)}</div>
+                            <div className="text-slate-300">{data.month}</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Month Label */}
+                    <div className="text-xs font-medium text-slate-600">
+                      {data.month}
+                    </div>
                   </div>
-                </div>
-              </div>
+                );
+              })}
             </div>
           )}
         </div>
 
-        {/* Monthly Revenue Bar Chart */}
-        <div className="lg:col-span-2 bg-white/60 backdrop-blur-sm rounded-2xl shadow-xl border border-slate-200/50 p-6">
-          <h3 className="text-xl font-bold text-slate-800 mb-6 flex items-center">
-            <ChartBarIcon className="w-6 h-6 mr-2 text-blue-600" />
-            Monthly Revenue Overview (Last 12 Months)
-          </h3>
-          
-          <div className="space-y-4">
-            {/* Legend */}
-            <div className="flex items-center justify-between text-sm">
-              <div className="flex items-center space-x-6">
-                <div className="flex items-center">
-                  <div className="w-4 h-4 bg-gradient-to-r from-blue-500 to-blue-600 rounded mr-2"></div>
-                  <span className="text-slate-600">Revenue</span>
-                </div>
-              </div>
-              <div className="text-slate-500">
-                Max: {formatCurrency(maxRevenue)}
-              </div>
-            </div>
-
-            {/* Bar Chart */}
-            <div className="flex items-end justify-between h-48 bg-gradient-to-t from-slate-50 to-transparent rounded-lg p-4 border">
-              {monthlyRevenue.length === 0 ? (
-                <div className="flex items-center justify-center w-full h-full text-slate-500">
-                  <div className="text-center">
-                    <div className="text-lg mb-2">📊</div>
-                    <div>Loading chart data...</div>
-                  </div>
-                </div>
-              ) : (
-                monthlyRevenue.map((data, index) => {
-                  // Ensure minimum visible height even for zero values
-                  const revenueHeight = maxRevenue > 0 ? (data.revenue / maxRevenue) * 85 : 0;
-                  const displayHeight = data.revenue > 0 ? Math.max(revenueHeight, 8) : 3;
-                  
-                  return (
-                    <div key={index} className="flex flex-col items-center space-y-2 flex-1 group">
-                      {/* Revenue Bar Container */}
-                      <div className="relative flex items-end" style={{ height: '180px' }}>
-                        <div 
-                          className={`w-8 rounded-t group-hover:shadow-lg transition-all duration-300 ${
-                            data.revenue === 0 ? 'bg-slate-300' : ''
-                          } ${
-                            data.isCurrentMonth 
-                              ? 'bg-gradient-to-t from-green-500 to-green-400' 
-                              : 'bg-gradient-to-t from-blue-500 to-blue-400'
-                          }`}
-                          style={{ height: `${displayHeight}px` }}
-                        >
-                          {/* Tooltip */}
-                          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10">
-                            <div className="bg-slate-800 text-white text-xs rounded py-1 px-2 whitespace-nowrap">
-                              <div>{formatCurrency(data.revenue)}</div>
-                              <div>{data.orders} orders</div>
-                              <div className="text-slate-300">{data.month} {data.year}</div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      {/* Month Label */}
-                      <div className="text-center">
-                        <div className={`text-xs font-medium ${
-                          data.isCurrentMonth ? 'text-green-600' : 'text-slate-600'
-                        }`}>
-                          {data.month}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-            
-            {/* Bottom info */}
-            <div className="flex justify-between items-center text-xs text-slate-500 mt-2">
-              <span>Hover over bars for details</span>
-              <div className="flex items-center">
-                <div className="w-3 h-3 bg-green-400 rounded mr-1"></div>
-                <span>Current Month</span>
-              </div>
-            </div>
-          </div>
+        {/* Chart Footer */}
+        <div className="mt-4 text-center">
+          <p className="text-xs text-slate-500">
+            Hover over bars to see details • Max: {formatCurrency(maxRevenue)}
+          </p>
         </div>
       </div>
     </div>
