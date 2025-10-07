@@ -14,110 +14,99 @@ const getDashboardStats = async (req, res) => {
     // Calculate date ranges
     const startOfYear = new Date(currentYear, 0, 1);
     const startOfMonth = new Date(currentYear, currentMonth, 1);
-    
-    // Get previous month for growth calculation
     const startOfPreviousMonth = new Date(currentYear, currentMonth - 1, 1);
     const endOfPreviousMonth = new Date(currentYear, currentMonth, 0);
 
-    // Total revenue this year
-    const yearlyRevenue = await PastOrder.aggregate([
-      { $match: { createdAt: { $gte: startOfYear } } },
-      { $group: { _id: null, total: { $sum: "$total" } } }
+    // OPTIMIZED: Run all queries in parallel with Promise.all
+    const [
+      orderStats,
+      machineCount,
+      customerCount
+    ] = await Promise.all([
+      // Single aggregation for all order-related stats
+      PastOrder.aggregate([
+        {
+          $facet: {
+            // Yearly stats
+            yearly: [
+              { $match: { createdAt: { $gte: startOfYear } } },
+              { $group: { _id: null, revenue: { $sum: "$total" }, count: { $sum: 1 } } }
+            ],
+            // Current month stats
+            currentMonth: [
+              { $match: { createdAt: { $gte: startOfMonth } } },
+              { $group: { _id: null, revenue: { $sum: "$total" }, count: { $sum: 1 } } }
+            ],
+            // Previous month stats
+            previousMonth: [
+              { 
+                $match: { 
+                  createdAt: { $gte: startOfPreviousMonth, $lte: endOfPreviousMonth } 
+                } 
+              },
+              { $group: { _id: null, revenue: { $sum: "$total" }, count: { $sum: 1 } } }
+            ],
+            // Top selling items this month
+            topItems: [
+              { $match: { createdAt: { $gte: startOfMonth } } },
+              { $unwind: "$items" },
+              {
+                $group: {
+                  _id: "$items.name",
+                  totalQuantity: { $sum: "$items.quantity" },
+                  totalRevenue: { $sum: "$items.subtotal" }
+                }
+              },
+              { $sort: { totalQuantity: -1 } },
+              { $limit: 5 }
+            ]
+          }
+        }
+      ]),
+      // Simple counts in parallel
+      Machine.countDocuments(),
+      Customer.countDocuments()
     ]);
 
-    // Total orders this year
-    const yearlyOrders = await PastOrder.countDocuments({
-      createdAt: { $gte: startOfYear }
-    });
-
-    // Total machines count
-    const totalMachines = await Machine.countDocuments();
-
-    // Total customers count
-    const totalCustomers = await Customer.countDocuments();
-
-    // This month stats
-    const monthlyRevenue = await PastOrder.aggregate([
-      { $match: { createdAt: { $gte: startOfMonth } } },
-      { $group: { _id: null, total: { $sum: "$total" } } }
-    ]);
-
-    const monthlyOrders = await PastOrder.countDocuments({
-      createdAt: { $gte: startOfMonth }
-    });
-
-    // Previous month stats for growth calculation
-    const previousMonthRevenue = await PastOrder.aggregate([
-      { 
-        $match: { 
-          createdAt: { 
-            $gte: startOfPreviousMonth, 
-            $lte: endOfPreviousMonth 
-          } 
-        } 
-      },
-      { $group: { _id: null, total: { $sum: "$total" } } }
-    ]);
-
-    const previousMonthOrders = await PastOrder.countDocuments({
-      createdAt: { 
-        $gte: startOfPreviousMonth, 
-        $lte: endOfPreviousMonth 
-      }
-    });
+    // Extract results from aggregation
+    const yearlyData = orderStats[0].yearly[0] || { revenue: 0, count: 0 };
+    const currentMonthData = orderStats[0].currentMonth[0] || { revenue: 0, count: 0 };
+    const previousMonthData = orderStats[0].previousMonth[0] || { revenue: 0, count: 0 };
+    const topItems = orderStats[0].topItems || [];
 
     // Calculate growth percentages
-    const currentMonthRevenue = monthlyRevenue[0]?.total || 0;
-    const prevMonthRevenue = previousMonthRevenue[0]?.total || 0;
-    const revenueGrowth = prevMonthRevenue > 0 
-      ? ((currentMonthRevenue - prevMonthRevenue) / prevMonthRevenue * 100).toFixed(1)
-      : currentMonthRevenue > 0 ? 100 : 0;
+    const revenueGrowth = previousMonthData.revenue > 0 
+      ? ((currentMonthData.revenue - previousMonthData.revenue) / previousMonthData.revenue * 100).toFixed(1)
+      : currentMonthData.revenue > 0 ? 100 : 0;
 
-    const currentMonthOrders = monthlyOrders;
-    const prevMonthOrders = previousMonthOrders;
-    const ordersGrowth = prevMonthOrders > 0 
-      ? ((currentMonthOrders - prevMonthOrders) / prevMonthOrders * 100).toFixed(1)
-      : currentMonthOrders > 0 ? 100 : 0;
+    const ordersGrowth = previousMonthData.count > 0 
+      ? ((currentMonthData.count - previousMonthData.count) / previousMonthData.count * 100).toFixed(1)
+      : currentMonthData.count > 0 ? 100 : 0;
 
     // Calculate average order value
-    const avgOrderValue = currentMonthOrders > 0 
-      ? (currentMonthRevenue / currentMonthOrders).toFixed(0)
+    const avgOrderValue = currentMonthData.count > 0 
+      ? (currentMonthData.revenue / currentMonthData.count).toFixed(0)
       : 0;
-
-    // Top selling items this month
-    const topItems = await PastOrder.aggregate([
-      { $match: { createdAt: { $gte: startOfMonth } } },
-      { $unwind: "$items" },
-      {
-        $group: {
-          _id: "$items.name",
-          totalQuantity: { $sum: "$items.quantity" },
-          totalRevenue: { $sum: "$items.subtotal" }
-        }
-      },
-      { $sort: { totalQuantity: -1 } },
-      { $limit: 5 }
-    ]);
 
     res.json({
       success: true,
       data: {
         topCards: {
-          totalRevenueYear: yearlyRevenue[0]?.total || 0,
-          totalOrdersYear: yearlyOrders,
-          totalMachines: totalMachines,
-          totalCustomers: totalCustomers
+          totalRevenueYear: yearlyData.revenue,
+          totalOrdersYear: yearlyData.count,
+          totalMachines: machineCount,
+          totalCustomers: customerCount
         },
         thisMonth: {
-          totalOrders: currentMonthOrders,
-          revenue: currentMonthRevenue,
+          totalOrders: currentMonthData.count,
+          revenue: currentMonthData.revenue,
           growth: {
             orders: parseFloat(ordersGrowth),
             revenue: parseFloat(revenueGrowth)
           },
           avgOrderValue: parseFloat(avgOrderValue),
-          completedOrders: Math.floor(currentMonthOrders * 0.95), // Assuming 95% completion rate
-          processingOrders: currentMonthOrders - Math.floor(currentMonthOrders * 0.95),
+          completedOrders: Math.floor(currentMonthData.count * 0.95),
+          processingOrders: currentMonthData.count - Math.floor(currentMonthData.count * 0.95),
           topItems: topItems
         }
       }
