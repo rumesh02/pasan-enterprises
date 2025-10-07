@@ -15,6 +15,7 @@ const Dashboard = () => {
   const [monthlyGraph, setMonthlyGraph] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [partialErrors, setPartialErrors] = useState([]);
 
   // Fetch all dashboard data
   useEffect(() => {
@@ -22,15 +23,13 @@ const Dashboard = () => {
       try {
         setLoading(true);
         setError(null);
+        setPartialErrors([]);
 
-        // Fetch all endpoints in parallel using the centralized API instance
-        const [
-          monthlyRevenueRes,
-          totalOrdersRes,
-          lowStockRes,
-          totalItemsRes,
-          monthlyGraphRes
-        ] = await Promise.all([
+        console.log('🔄 Dashboard: Starting to fetch data...');
+        console.log('📡 API Base URL:', api.defaults?.baseURL || 'Using centralized API config');
+
+        // Fetch all endpoints in parallel with individual error handling
+        const results = await Promise.allSettled([
           api.get('/dashboard/monthly-revenue'),
           api.get('/dashboard/total-orders'),
           api.get('/dashboard/low-stock'),
@@ -38,26 +37,70 @@ const Dashboard = () => {
           api.get('/dashboard/monthly-graph')
         ]);
 
-        // Set state for each metric
-        if (monthlyRevenueRes.data.success) {
-          setMonthlyRevenue(monthlyRevenueRes.data.data);
+        const failedRequests = [];
+
+        // Process monthly revenue
+        if (results[0].status === 'fulfilled' && results[0].value.data.success) {
+          console.log('✅ Monthly Revenue loaded:', results[0].value.data.data);
+          setMonthlyRevenue(results[0].value.data.data);
+        } else {
+          console.error('❌ Monthly Revenue failed:', results[0].reason || 'Unknown error');
+          failedRequests.push('Monthly Revenue');
         }
-        if (totalOrdersRes.data.success) {
-          setTotalOrders(totalOrdersRes.data.data);
+
+        // Process total orders
+        if (results[1].status === 'fulfilled' && results[1].value.data.success) {
+          console.log('✅ Total Orders loaded:', results[1].value.data.data);
+          setTotalOrders(results[1].value.data.data);
+        } else {
+          console.error('❌ Total Orders failed:', results[1].reason || 'Unknown error');
+          failedRequests.push('Total Orders');
         }
-        if (lowStockRes.data.success) {
-          setLowStock(lowStockRes.data.data);
+
+        // Process low stock
+        if (results[2].status === 'fulfilled' && results[2].value.data.success) {
+          console.log('✅ Low Stock loaded:', results[2].value.data.data);
+          setLowStock(results[2].value.data.data);
+        } else {
+          console.error('❌ Low Stock failed:', results[2].reason || 'Unknown error');
+          failedRequests.push('Low Stock');
         }
-        if (totalItemsRes.data.success) {
-          setTotalItems(totalItemsRes.data.data);
+
+        // Process total items
+        if (results[3].status === 'fulfilled' && results[3].value.data.success) {
+          console.log('✅ Total Items loaded:', results[3].value.data.data);
+          setTotalItems(results[3].value.data.data);
+        } else {
+          console.error('❌ Total Items failed:', results[3].reason || 'Unknown error');
+          failedRequests.push('Total Items');
         }
-        if (monthlyGraphRes.data.success) {
-          setMonthlyGraph(monthlyGraphRes.data.data);
+
+        // Process monthly graph
+        if (results[4].status === 'fulfilled' && results[4].value.data.success) {
+          console.log('✅ Monthly Graph loaded:', results[4].value.data.data);
+          setMonthlyGraph(results[4].value.data.data);
+        } else {
+          console.error('❌ Monthly Graph failed:', results[4].reason || 'Unknown error');
+          failedRequests.push('Monthly Graph');
+        }
+
+        // Set partial errors if any requests failed
+        if (failedRequests.length > 0) {
+          setPartialErrors(failedRequests);
+          console.warn('⚠️ Dashboard loaded with some errors:', failedRequests);
+        } else {
+          console.log('✅ Dashboard: All data loaded successfully!');
         }
 
       } catch (err) {
-        console.error('Error fetching dashboard data:', err);
-        setError(err.response?.data?.message || 'Failed to fetch dashboard data');
+        console.error('❌ Critical Dashboard error:', err);
+        console.error('Error details:', {
+          message: err.message,
+          response: err.response?.data,
+          status: err.response?.status,
+          config: err.config?.url
+        });
+        setError(err.response?.data?.message || err.message || 'Failed to fetch dashboard data');
       } finally {
         setLoading(false);
       }
@@ -113,6 +156,19 @@ const Dashboard = () => {
         <h1 className="text-3xl font-bold text-slate-800">Dashboard</h1>
         <p className="text-slate-600 mt-2">Business overview and statistics</p>
       </div>
+
+      {/* Partial Errors Warning */}
+      {partialErrors.length > 0 && (
+        <div className="mb-6 bg-yellow-50 border border-yellow-200 text-yellow-800 px-6 py-4 rounded-lg">
+          <div className="flex items-start">
+            <ExclamationTriangleIcon className="w-5 h-5 mt-0.5 mr-2 flex-shrink-0" />
+            <div>
+              <h3 className="font-semibold mb-1">Some data could not be loaded</h3>
+              <p className="text-sm">Failed to load: {partialErrors.join(', ')}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Statistic Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
