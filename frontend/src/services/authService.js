@@ -1,10 +1,16 @@
 // Determine the API base URL based on environment
 const getBaseURL = () => {
-  // Check if running on localhost (development)
+  // Priority 1: Use your backend from environment variable if available
+  if (process.env.REACT_APP_API_URL) {
+    return process.env.REACT_APP_API_URL;
+  }
+  
+  // Priority 2: Check if running on localhost (development)
   if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
     return 'http://localhost:5000/api';
   }
-  // Production URL
+  
+  // Priority 3: Fallback to friend's backend (keep as backup)
   return 'https://pasan-enterprises.me/api';
 };
 
