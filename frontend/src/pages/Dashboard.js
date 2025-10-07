@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { dashboardAPI } from '../services/apiService';
+import api from '../services/apiService';
 import { 
   CurrencyDollarIcon, 
   ShoppingCartIcon,
@@ -26,60 +26,79 @@ const Dashboard = () => {
         setPartialErrors([]);
 
         console.log('🔄 Dashboard: Starting to fetch data...');
-
-        // Fetch all endpoints in parallel with individual error handling
-        const results = await Promise.allSettled([
-          dashboardAPI.getMonthlyRevenue(),
-          dashboardAPI.getTotalOrders(),
-          dashboardAPI.getLowStock(),
-          dashboardAPI.getTotalItems(),
-          dashboardAPI.getMonthlyGraph()
-        ]);
+        console.log('📡 API Base URL:', api.defaults.baseURL);
+        console.log('🌍 Environment:', process.env.NODE_ENV);
+        console.log('🔗 REACT_APP_API_URL:', process.env.REACT_APP_API_URL);
 
         const failedRequests = [];
 
-        // Process monthly revenue
-        if (results[0].status === 'fulfilled' && results[0].value.data.success) {
-          console.log('✅ Monthly Revenue loaded:', results[0].value.data.data);
-          setMonthlyRevenue(results[0].value.data.data);
-        } else {
-          console.error('❌ Monthly Revenue failed:', results[0].reason || 'Unknown error');
+        // Fetch Monthly Revenue
+        try {
+          const response = await api.get('/dashboard/monthly-revenue');
+          console.log('✅ Monthly Revenue loaded:', response.data);
+          if (response.data.success) {
+            setMonthlyRevenue(response.data.data);
+          }
+        } catch (err) {
+          console.error('❌ Monthly Revenue failed:', err.message);
+          console.error('   URL attempted:', err.config?.url);
+          console.error('   Status:', err.response?.status);
           failedRequests.push('Monthly Revenue');
         }
 
-        // Process total orders
-        if (results[1].status === 'fulfilled' && results[1].value.data.success) {
-          console.log('✅ Total Orders loaded:', results[1].value.data.data);
-          setTotalOrders(results[1].value.data.data);
-        } else {
-          console.error('❌ Total Orders failed:', results[1].reason || 'Unknown error');
+        // Fetch Total Orders
+        try {
+          const response = await api.get('/dashboard/total-orders');
+          console.log('✅ Total Orders loaded:', response.data);
+          if (response.data.success) {
+            setTotalOrders(response.data.data);
+          }
+        } catch (err) {
+          console.error('❌ Total Orders failed:', err.message);
+          console.error('   URL attempted:', err.config?.url);
+          console.error('   Status:', err.response?.status);
           failedRequests.push('Total Orders');
         }
 
-        // Process low stock
-        if (results[2].status === 'fulfilled' && results[2].value.data.success) {
-          console.log('✅ Low Stock loaded:', results[2].value.data.data);
-          setLowStock(results[2].value.data.data);
-        } else {
-          console.error('❌ Low Stock failed:', results[2].reason || 'Unknown error');
+        // Fetch Low Stock
+        try {
+          const response = await api.get('/dashboard/low-stock');
+          console.log('✅ Low Stock loaded:', response.data);
+          if (response.data.success) {
+            setLowStock(response.data.data);
+          }
+        } catch (err) {
+          console.error('❌ Low Stock failed:', err.message);
+          console.error('   URL attempted:', err.config?.url);
+          console.error('   Status:', err.response?.status);
           failedRequests.push('Low Stock');
         }
 
-        // Process total items
-        if (results[3].status === 'fulfilled' && results[3].value.data.success) {
-          console.log('✅ Total Items loaded:', results[3].value.data.data);
-          setTotalItems(results[3].value.data.data);
-        } else {
-          console.error('❌ Total Items failed:', results[3].reason || 'Unknown error');
+        // Fetch Total Items
+        try {
+          const response = await api.get('/dashboard/total-items');
+          console.log('✅ Total Items loaded:', response.data);
+          if (response.data.success) {
+            setTotalItems(response.data.data);
+          }
+        } catch (err) {
+          console.error('❌ Total Items failed:', err.message);
+          console.error('   URL attempted:', err.config?.url);
+          console.error('   Status:', err.response?.status);
           failedRequests.push('Total Items');
         }
 
-        // Process monthly graph
-        if (results[4].status === 'fulfilled' && results[4].value.data.success) {
-          console.log('✅ Monthly Graph loaded:', results[4].value.data.data);
-          setMonthlyGraph(results[4].value.data.data);
-        } else {
-          console.error('❌ Monthly Graph failed:', results[4].reason || 'Unknown error');
+        // Fetch Monthly Graph
+        try {
+          const response = await api.get('/dashboard/monthly-graph');
+          console.log('✅ Monthly Graph loaded:', response.data);
+          if (response.data.success) {
+            setMonthlyGraph(response.data.data);
+          }
+        } catch (err) {
+          console.error('❌ Monthly Graph failed:', err.message);
+          console.error('   URL attempted:', err.config?.url);
+          console.error('   Status:', err.response?.status);
           failedRequests.push('Monthly Graph');
         }
 
