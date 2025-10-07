@@ -2,16 +2,17 @@ import axios from 'axios';
 
 // Determine the API base URL based on environment
 const getBaseURL = () => {
-  // Use environment variable if available, otherwise fallback to defaults
+  // Priority 1: Use your backend from environment variable if available
   if (process.env.REACT_APP_API_URL) {
     return process.env.REACT_APP_API_URL;
   }
   
-  // Check if running on localhost (development)
+  // Priority 2: Check if running on localhost (development)
   if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
     return 'http://localhost:5000/api';
   }
-  // Production URL fallback
+  
+  // Priority 3: Fallback to friend's backend (keep as backup)
   return 'https://pasan-enterprises.me/api';
 };
 
