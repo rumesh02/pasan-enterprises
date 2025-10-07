@@ -9,12 +9,13 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Middleware
-// Allow both localhost (development) and production URL
-const allowedOrigins = [
-  'http://localhost:3000',
-  'https://main.d1ukwwdrgqtdby.amplifyapp.com',
-  process.env.FRONTEND_URL
-].filter(Boolean);
+// Allow origins from environment variable or defaults
+const allowedOrigins = process.env.ALLOWED_ORIGINS 
+  ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
+  : [
+      'http://localhost:3000',
+      process.env.FRONTEND_URL
+    ].filter(Boolean);
 
 app.use(cors({
   origin: function (origin, callback) {
