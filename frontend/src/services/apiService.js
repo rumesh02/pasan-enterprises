@@ -169,6 +169,24 @@ export const userAPI = {
   delete: (id) => api.delete(`/users/${id}`),
 };
 
+// Dashboard API
+export const dashboardAPI = {
+  // Get monthly revenue
+  getMonthlyRevenue: () => api.get('/dashboard/monthly-revenue'),
+  
+  // Get total orders
+  getTotalOrders: () => api.get('/dashboard/total-orders'),
+  
+  // Get low stock items
+  getLowStock: () => api.get('/dashboard/low-stock'),
+  
+  // Get total items
+  getTotalItems: () => api.get('/dashboard/total-items'),
+  
+  // Get monthly graph data
+  getMonthlyGraph: () => api.get('/dashboard/monthly-graph'),
+};
+
 // Error handler utility
 export const handleApiError = (error) => {
   if (error.response) {

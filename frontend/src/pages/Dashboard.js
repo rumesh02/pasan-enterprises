@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import api from '../services/apiService';
+import { dashboardAPI } from '../services/apiService';
 import { 
   CurrencyDollarIcon, 
   ShoppingCartIcon,
@@ -26,15 +26,14 @@ const Dashboard = () => {
         setPartialErrors([]);
 
         console.log('🔄 Dashboard: Starting to fetch data...');
-        console.log('📡 API Base URL:', api.defaults?.baseURL || 'Using centralized API config');
 
         // Fetch all endpoints in parallel with individual error handling
         const results = await Promise.allSettled([
-          api.get('/dashboard/monthly-revenue'),
-          api.get('/dashboard/total-orders'),
-          api.get('/dashboard/low-stock'),
-          api.get('/dashboard/total-items'),
-          api.get('/dashboard/monthly-graph')
+          dashboardAPI.getMonthlyRevenue(),
+          dashboardAPI.getTotalOrders(),
+          dashboardAPI.getLowStock(),
+          dashboardAPI.getTotalItems(),
+          dashboardAPI.getMonthlyGraph()
         ]);
 
         const failedRequests = [];
