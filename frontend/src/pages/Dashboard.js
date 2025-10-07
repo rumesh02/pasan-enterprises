@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../services/apiService';
 import { 
   CurrencyDollarIcon, 
   ShoppingCartIcon,
@@ -16,8 +16,6 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
-
   // Fetch all dashboard data
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -25,7 +23,7 @@ const Dashboard = () => {
         setLoading(true);
         setError(null);
 
-        // Fetch all endpoints in parallel
+        // Fetch all endpoints in parallel using the centralized API instance
         const [
           monthlyRevenueRes,
           totalOrdersRes,
@@ -33,11 +31,11 @@ const Dashboard = () => {
           totalItemsRes,
           monthlyGraphRes
         ] = await Promise.all([
-          axios.get(`${API_URL}/dashboard/monthly-revenue`),
-          axios.get(`${API_URL}/dashboard/total-orders`),
-          axios.get(`${API_URL}/dashboard/low-stock`),
-          axios.get(`${API_URL}/dashboard/total-items`),
-          axios.get(`${API_URL}/dashboard/monthly-graph`)
+          api.get('/dashboard/monthly-revenue'),
+          api.get('/dashboard/total-orders'),
+          api.get('/dashboard/low-stock'),
+          api.get('/dashboard/total-items'),
+          api.get('/dashboard/monthly-graph')
         ]);
 
         // Set state for each metric
@@ -66,7 +64,7 @@ const Dashboard = () => {
     };
 
     fetchDashboardData();
-  }, [API_URL]);
+  }, []);
 
   // Format currency as "LKR 123,456.78"
   const formatCurrency = (amount) => {
