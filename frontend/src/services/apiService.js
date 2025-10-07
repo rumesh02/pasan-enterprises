@@ -2,16 +2,17 @@ import axios from 'axios';
 
 // Determine the API base URL based on environment
 const getBaseURL = () => {
-  // Use environment variable if available, otherwise fallback to defaults
+  // Priority 1: Use environment variable if available
   if (process.env.REACT_APP_API_URL) {
     return process.env.REACT_APP_API_URL;
   }
-  
-  // Check if running on localhost (development)
+
+  // Priority 2: Check if running on localhost (development)
   if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
     return 'http://localhost:5000/api';
   }
-  // Production URL fallback
+
+  // Priority 3: Fallback to production URL
   return 'https://pasan-enterprises.me/api';
 };
 
@@ -21,187 +22,109 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 30000, // 30 seconds timeout for slower operations like dashboard stats
+  timeout: 30000, // 30 seconds timeout
 });
 
-// Request interceptor
+// Request interceptor: attach token if exists
 api.interceptors.request.use(
   (config) => {
-    // Add auth token if available
     const token = sessionStorage.getItem('authToken');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-// Response interceptor
+// Response interceptor: handle errors globally
 api.interceptors.response.use(
-  (response) => {
-    return response;
-  },
+  (response) => response,
   (error) => {
-    // Handle common errors
     if (error.response?.status === 401) {
-      // Handle unauthorized access
+      // Unauthorized, log out user
       sessionStorage.removeItem('authToken');
       sessionStorage.removeItem('user');
       sessionStorage.removeItem('isLoggedIn');
       window.location.href = '/login';
     }
-    
     return Promise.reject(error);
   }
 );
 
+// ----- API Endpoints -----
+
 // Machine API
 export const machineAPI = {
-  // Get all machines with optional filters
   getAll: (params = {}) => api.get('/machines', { params }),
-  
-  // Get single machine by ID
   getById: (id) => api.get(`/machines/${id}`),
-  
-  // Create new machine
   create: (data) => api.post('/machines', data),
-  
-  // Update machine
   update: (id, data) => api.put(`/machines/${id}`, data),
-  
-  // Delete machine
   delete: (id) => api.delete(`/machines/${id}`),
-  
-  // Get machine categories
   getCategories: () => api.get('/machines/categories'),
 };
 
 // Customer API
 export const customerAPI = {
-  // Get all customers with optional filters
   getAll: (params = {}) => api.get('/customers', { params }),
-  
-  // Get single customer by ID
   getById: (id) => api.get(`/customers/${id}`),
-  
-  // Create new customer
   create: (data) => api.post('/customers', data),
-  
-  // Update customer
   update: (id, data) => api.put(`/customers/${id}`, data),
-  
-  // Delete customer
   delete: (id) => api.delete(`/customers/${id}`),
-  
-  // Get customer statistics
   getStats: () => api.get('/customers/stats'),
 };
 
 // Sales API
 export const salesAPI = {
-  // Process a sale
   process: (data) => api.post('/sales', data),
-  
-  // Validate sale data
   validate: (data) => api.post('/sales/validate', data),
-  
-  // Get sales statistics
   getStats: () => api.get('/sales/stats'),
 };
 
 // Past Orders API
 export const pastOrdersAPI = {
-  // Get all past orders with optional filters
   getAll: (params = {}) => api.get('/past-orders', { params }),
-  
-  // Get single order by ID
   getById: (id) => api.get(`/past-orders/${id}`),
-  
-  // Get order by order ID
   getByOrderId: (orderId) => api.get(`/past-orders/order/${orderId}`),
-  
-  // Update order status
   updateStatus: (id, data) => api.patch(`/past-orders/${id}/status`, data),
-  
-  // Get order statistics
   getStats: () => api.get('/past-orders/stats'),
-  
-  // Get orders by date range
   getByDateRange: (params) => api.get('/past-orders/range', { params }),
-  
-  // Get machine sales statistics
   getMachineSalesStats: (machineId) => api.get(`/past-orders/machine-stats/${machineId}`),
-  
-  // Cancel order
   cancel: (id) => api.delete(`/past-orders/${id}`),
-  
-  // Return item from order
   returnItem: (orderId, data) => api.put(`/past-orders/return-item/${orderId}`, data),
-  
-  // Update/Edit order
   update: (orderId, data) => api.put(`/past-orders/${orderId}`, data),
 };
 
 // User API
 export const userAPI = {
-  // Login user
   login: (data) => api.post('/users/login', data),
-  
-  // Get current user profile
   getCurrentUser: () => api.get('/users/me'),
-  
-  // Get all users
   getAll: (params = {}) => api.get('/users', { params }),
-  
-  // Get single user by ID
   getById: (id) => api.get(`/users/${id}`),
-  
-  // Create new user
   create: (data) => api.post('/users', data),
-  
-  // Update user
   update: (id, data) => api.put(`/users/${id}`, data),
-  
-  // Delete user
   delete: (id) => api.delete(`/users/${id}`),
 };
 
 // Dashboard API
 export const dashboardAPI = {
-  // Get monthly revenue
   getMonthlyRevenue: () => api.get('/dashboard/monthly-revenue'),
-  
-  // Get total orders
   getTotalOrders: () => api.get('/dashboard/total-orders'),
-  
-  // Get low stock items
   getLowStock: () => api.get('/dashboard/low-stock'),
-  
-  // Get total items
   getTotalItems: () => api.get('/dashboard/total-items'),
-  
-  // Get monthly graph data
   getMonthlyGraph: () => api.get('/dashboard/monthly-graph'),
 };
 
-// Error handler utility
+// ----- Error Handler Utility -----
 export const handleApiError = (error) => {
   if (error.response) {
-    // Server responded with error status
-    const message = error.response.data?.message || 'An error occurred';
-    const errors = error.response.data?.errors || [];
-    
     return {
-      message,
-      errors,
+      message: error.response.data?.message || 'An error occurred',
+      errors: error.response.data?.errors || [],
       status: error.response.status,
       data: error.response.data
     };
   } else if (error.request) {
-    // Request made but no response received
     return {
       message: 'Network error - please check your connection',
       errors: [],
@@ -209,7 +132,6 @@ export const handleApiError = (error) => {
       data: null
     };
   } else {
-    // Something else happened
     return {
       message: error.message || 'An unexpected error occurred',
       errors: [],
