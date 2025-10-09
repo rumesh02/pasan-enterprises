@@ -5,21 +5,26 @@ import {
   EyeIcon, 
   PencilIcon, 
   TrashIcon,
-  XMarkIcon
+  XMarkIcon,
+  ShoppingCartIcon
 } from '@heroicons/react/24/outline';
 import { machineService } from '../services/machineService';
+import { pastOrdersAPI } from '../services/apiService';
 
 const ViewInventory = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
+  const [filterStatus, setFilterStatus] = useState('all');
   const [machines, setMachines] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedMachine, setSelectedMachine] = useState(null);
+  const [salesStats, setSalesStats] = useState(null);
+  const [loadingStats, setLoadingStats] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
+  const [itemsPerPage] = useState(20);
   const [editFormData, setEditFormData] = useState({
     itemId: '',
     name: '',
@@ -30,6 +35,7 @@ const ViewInventory = () => {
   });
 
   const categories = ['all', 'Pumps', 'Motors', 'Pipes', 'Bearings', 'Valves', 'Filters', 'Seals', 'Tools', 'Electronics', 'Other'];
+  const statusOptions = ['all', 'in-stock', 'low-stock', 'out-of-stock'];
 
   // Fetch machines from database
   useEffect(() => {
@@ -39,7 +45,8 @@ const ViewInventory = () => {
   const fetchMachines = async () => {
     try {
       setLoading(true);
-      const response = await machineService.getAllMachines();
+      // Use a reasonable limit of 200 for better performance while still showing most inventory
+      const response = await machineService.getAllMachines({ limit: 200 });
       console.log('API Response:', response); // Debug log
       
       // The backend returns machines in response.data
@@ -55,39 +62,9 @@ const ViewInventory = () => {
     }
   };
 
-  const filteredItems = Array.isArray(machines) ? machines.filter(item => {
-    const matchesSearch = item.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         item.itemId?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = filterCategory === 'all' || item.category === filterCategory;
-    return matchesSearch && matchesCategory;
-  }) : [];
-
-  // Pagination calculations
-  const totalPages = Math.ceil(filteredItems.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const currentItems = filteredItems.slice(startIndex, endIndex);
-
-  // Reset to page 1 when search or filter changes
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, filterCategory]);
-
-  const handlePageChange = (pageNumber) => {
-    setCurrentPage(pageNumber);
-  };
-
-  const handlePrevPage = () => {
-    setCurrentPage(prev => Math.max(prev - 1, 1));
-  };
-
-  const handleNextPage = () => {
-    setCurrentPage(prev => Math.min(prev + 1, totalPages));
-  };
-
   const getStatus = (quantity) => {
     if (quantity === 0) return 'Out of Stock';
-    if (quantity <= 5) return 'Low Stock';
+    if (quantity <= 2) return 'Low Stock';
     return 'In Stock';
   };
 
@@ -101,9 +78,82 @@ const ViewInventory = () => {
     }
   };
 
-  const handleViewDetails = (machine) => {
+  const filteredItems = Array.isArray(machines) ? machines.filter(item => {
+    const matchesSearch = item.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         item.itemId?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = filterCategory === 'all' || item.category === filterCategory;
+    
+    // Status filtering logic
+    const itemStatus = getStatus(item.quantity);
+    let matchesStatus = false;
+    if (filterStatus === 'all') {
+      matchesStatus = true;
+    } else if (filterStatus === 'in-stock') {
+      matchesStatus = itemStatus === 'In Stock';
+    } else if (filterStatus === 'low-stock') {
+      matchesStatus = itemStatus === 'Low Stock';
+    } else if (filterStatus === 'out-of-stock') {
+      matchesStatus = itemStatus === 'Out of Stock';
+    }
+    
+    return matchesSearch && matchesCategory && matchesStatus;
+  }) : [];
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredItems.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentItems = filteredItems.slice(startIndex, endIndex);
+
+  // Reset to page 1 when search or filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterCategory, filterStatus]);
+
+  const handlePageChange = (pageNumber) => {
+    setCurrentPage(pageNumber);
+  };
+
+  const handlePrevPage = () => {
+    setCurrentPage(prev => Math.max(prev - 1, 1));
+  };
+
+  const handleNextPage = () => {
+    setCurrentPage(prev => Math.min(prev + 1, totalPages));
+  };
+
+
+
+  const handleViewDetails = async (machine) => {
     setSelectedMachine(machine);
     setShowDetailsModal(true);
+    setSalesStats(null);
+    
+    // Fetch sales statistics with timeout
+    try {
+      setLoadingStats(true);
+      
+      // Create a timeout promise
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Request timeout')), 15000)
+      );
+      
+      // Race between the API call and timeout
+      const response = await Promise.race([
+        pastOrdersAPI.getMachineSalesStats(machine._id),
+        timeoutPromise
+      ]);
+      
+      if (response.data.success) {
+        setSalesStats(response.data.data);
+      }
+    } catch (err) {
+      console.error('Error fetching sales stats:', err);
+      // Set to zero instead of null to show "No sales" rather than error
+      setSalesStats({ totalSold: 0 });
+    } finally {
+      setLoadingStats(false);
+    }
   };
 
   const handleEdit = (machine) => {
@@ -199,6 +249,25 @@ const ViewInventory = () => {
               ))}
             </select>
           </div>
+
+          {/* Status Filter */}
+          <div className="relative">
+            <FunnelIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="pl-10 pr-8 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/50"
+            >
+              {statusOptions.map(status => (
+                <option key={status} value={status}>
+                  {status === 'all' ? 'All Status' : 
+                   status === 'in-stock' ? 'In Stock' :
+                   status === 'low-stock' ? 'Low Stock' :
+                   status === 'out-of-stock' ? 'Out of Stock' : status}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
@@ -206,7 +275,7 @@ const ViewInventory = () => {
       {loading && (
         <div className="bg-white/60 backdrop-blur-sm rounded-2xl shadow-xl border border-slate-200/50 p-12">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <div className="animate-spin-fast rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
             <p className="text-slate-600">Loading machines...</p>
           </div>
         </div>
@@ -439,6 +508,38 @@ const ViewInventory = () => {
                   <label className="block text-sm font-semibold text-slate-700 mb-1">Last Updated</label>
                   <p className="text-slate-800 bg-slate-50 p-3 rounded-lg">{formatDate(selectedMachine.updatedAt)}</p>
                 </div>
+              </div>
+
+              {/* Sold Items Count Section */}
+              <div className="pt-6 border-t border-slate-200">
+                <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center">
+                  <ShoppingCartIcon className="w-6 h-6 mr-2 text-blue-600" />
+                  Sold Items Count
+                </h3>
+                
+                {loadingStats ? (
+                  <div className="text-center py-6">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                    <p className="text-slate-500 text-sm">Loading...</p>
+                  </div>
+                ) : salesStats ? (
+                  <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-6 rounded-xl border border-blue-200">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-blue-600 mb-1">TOTAL SOLD</p>
+                        <p className="text-4xl font-bold text-blue-900">{salesStats.totalSold || 0}</p>
+                        <p className="text-sm text-blue-700 mt-2">Units sold</p>
+                      </div>
+                      <ShoppingCartIcon className="w-16 h-16 text-blue-300" />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8 bg-slate-50 rounded-lg">
+                    <ShoppingCartIcon className="w-12 h-12 text-slate-300 mx-auto mb-2" />
+                    <p className="text-slate-500">No sales data available</p>
+                    <p className="text-sm text-slate-400 mt-1">This item hasn't been sold yet</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>

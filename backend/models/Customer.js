@@ -74,6 +74,7 @@ const customerSchema = new mongoose.Schema({
     type: String,
     trim: true,
     uppercase: true,
+    unique: true,
     sparse: true, // Allows multiple documents with null/undefined NIC
     validate: {
       validator: function(v) {
@@ -82,6 +83,11 @@ const customerSchema = new mongoose.Schema({
       },
       message: 'Please enter a valid NIC number (9 digits + V/X or 12 digits)'
     }
+  },
+  address: {
+    type: String,
+    trim: true,
+    maxlength: [500, 'Address cannot exceed 500 characters']
   },
   totalOrders: {
     type: Number,
@@ -102,7 +108,7 @@ const customerSchema = new mongoose.Schema({
 
 // Indexes for better query performance
 customerSchema.index({ phone: 1 }, { unique: true });
-customerSchema.index({ nic: 1 }, { sparse: true, unique: true });
+// NIC index is now defined in the schema field itself with unique: true and sparse: true
 customerSchema.index({ email: 1 }, { sparse: true });
 customerSchema.index({ name: 'text' });
 

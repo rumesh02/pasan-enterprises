@@ -9,8 +9,25 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Middleware
+// Allow origins from environment variable or defaults
+const allowedOrigins = process.env.ALLOWED_ORIGINS 
+  ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
+  : [
+      'http://localhost:3000',
+      process.env.FRONTEND_URL
+    ].filter(Boolean);
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or Postman)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.some(allowed => origin.startsWith(allowed.replace(/\/$/, '')))) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true
 }));
 app.use(express.json());
@@ -45,6 +62,7 @@ const machineRoutes = require('./routes/machines');
 const customerRoutes = require('./routes/customers');
 const salesRoutes = require('./routes/sales');
 const pastOrderRoutes = require('./routes/pastOrders');
+const dashboardRoutes = require('./routes/dashboard');
 
 // Use routes
 app.use('/api/users', userRoutes);
@@ -53,6 +71,7 @@ app.use('/api/machines', machineRoutes);
 app.use('/api/customers', customerRoutes);
 app.use('/api/sales', salesRoutes);
 app.use('/api/past-orders', pastOrderRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -64,10 +83,10 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`🌐 API available at: http://localhost:${PORT}`);
+// Start HTTP server (plain, Nginx will handle HTTPS)
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`✅ Node server running on port ${PORT}`);
+  console.log(`🌐 API available at http://localhost:${PORT}`);
   console.log(`📚 Health check: http://localhost:${PORT}/health`);
 });
 

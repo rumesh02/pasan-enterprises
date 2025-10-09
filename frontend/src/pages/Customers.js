@@ -17,6 +17,15 @@ import {
 import { customerAPI, handleApiError } from '../services/apiService';
 
 const Customers = () => {
+  // Helper function to format dates as DD/MM/YYYY
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  };
+
   const [customers, setCustomers] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
@@ -28,7 +37,8 @@ const Customers = () => {
     name: '',
     email: '',
     phone: '',
-    nic: ''
+    nic: '',
+    address: ''
   });
 
   // Load customers from backend
@@ -40,7 +50,7 @@ const Customers = () => {
     try {
       setLoading(true);
       setError('');
-      const response = await customerAPI.getAll();
+      const response = await customerAPI.getAll({ limit: 1000 }); // Request a high limit to get all customers
       console.log('API Response:', response.data);
       
       if (response.data.success) {
@@ -71,7 +81,8 @@ const Customers = () => {
       name: '',
       email: '',
       phone: '',
-      nic: ''
+      nic: '',
+      address: ''
     });
     setEditingCustomer(null);
     setShowAddModal(true);
@@ -82,7 +93,8 @@ const Customers = () => {
       name: customer.name,
       email: customer.email,
       phone: customer.phone,
-      nic: customer.nic
+      nic: customer.nic,
+      address: customer.address || ''
     });
     setEditingCustomer(customer._id);
     setShowAddModal(true);
@@ -229,7 +241,7 @@ const Customers = () => {
         
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <div className="animate-spin-fast rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             <span className="ml-3 text-slate-600">Loading customers...</span>
           </div>
         ) : filteredCustomers.length === 0 ? (
@@ -302,7 +314,7 @@ const Customers = () => {
                         </span>
                         {customer.lastOrderDate && (
                           <p className="text-xs text-slate-500">
-                            Last order: {new Date(customer.lastOrderDate).toLocaleDateString()}
+                            Last order: {formatDate(customer.lastOrderDate)}
                           </p>
                         )}
                       </div>
@@ -425,6 +437,26 @@ const Customers = () => {
                   onChange={(e) => setFormData({...formData, nic: e.target.value})}
                   className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="Enter NIC number (optional - e.g., 123456789V or 199812345678)"
+                  disabled={submitting}
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  <span className="flex items-center space-x-2">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    <span>Address</span>
+                  </span>
+                </label>
+                <textarea
+                  value={formData.address}
+                  onChange={(e) => setFormData({...formData, address: e.target.value})}
+                  className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Enter customer address (optional)"
+                  rows="3"
                   disabled={submitting}
                 />
               </div>

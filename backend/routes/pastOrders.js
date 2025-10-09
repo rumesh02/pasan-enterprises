@@ -7,13 +7,21 @@ const {
   updateOrderStatus,
   getOrderStats,
   getOrdersByDateRange,
-  deleteOrder
+  deleteOrder,
+  returnItem,
+  updateOrder,
+  getMachineSalesStats
 } = require('../controllers/ordersController');
 
 // @route   GET /api/past-orders/stats
 // @desc    Get order statistics
 // @access  Public
 router.get('/stats', getOrderStats);
+
+// @route   GET /api/past-orders/machine-stats/:machineId
+// @desc    Get sales statistics for a specific machine
+// @access  Public
+router.get('/machine-stats/:machineId', getMachineSalesStats);
 
 // @route   GET /api/past-orders/range
 // @desc    Get orders by date range
@@ -39,6 +47,16 @@ router.get('/:id', getOrderById);
 // @desc    Update order status
 // @access  Public
 router.patch('/:id/status', updateOrderStatus);
+
+// @route   PUT /api/past-orders/return-item/:orderId
+// @desc    Return an item from an order
+// @access  Public
+router.put('/return-item/:orderId', returnItem);
+
+// @route   PUT /api/past-orders/:orderId
+// @desc    Update/Edit an order
+// @access  Public
+router.put('/:orderId', updateOrder);
 
 // @route   DELETE /api/past-orders/:id
 // @desc    Cancel order (soft delete)

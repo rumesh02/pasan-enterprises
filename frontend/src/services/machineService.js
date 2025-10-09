@@ -1,11 +1,29 @@
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+// Determine the API base URL based on environment
+const getBaseURL = () => {
+  // Priority 1: Use your backend from environment variable if available
+  if (process.env.REACT_APP_API_URL) {
+    return process.env.REACT_APP_API_URL;
+  }
+  
+  // Priority 2: Check if running on localhost (development)
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    return 'http://localhost:5000/api';
+  }
+  
+  // Priority 3: Fallback to friend's backend (keep as backup)
+  return 'https://pasan-enterprises.me/api';
+};
+
+const API_BASE_URL = getBaseURL();
 
 // Machine API Service
 export const machineService = {
   // Get all machines
-  getAllMachines: async () => {
+  getAllMachines: async (params = {}) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/machines`);
+      const queryString = new URLSearchParams(params).toString();
+      const url = queryString ? `${API_BASE_URL}/machines?${queryString}` : `${API_BASE_URL}/machines`;
+      const response = await fetch(url);
       const data = await response.json();
       
       if (!response.ok) {

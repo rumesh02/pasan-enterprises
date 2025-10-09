@@ -161,14 +161,14 @@ function App() {
                   <div className="flex items-center space-x-2">
                     <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
                     <span className="text-sm text-slate-600 font-medium">
-                      Hi, {currentUser.fullName || currentUser.username}
+                       {currentUser.fullName || currentUser.username}
                     </span>
                   </div>
                 )}
                 
                 <button
                   onClick={handleLogout}
-                  className="px-3 py-1 rounded-md bg-slate-100 hover:bg-slate-200 text-sm font-medium transition-colors"
+                  className="px-3 py-1 rounded-md bg-red-500 hover:bg-red-600 text-white text-sm font-medium transition-colors shadow-sm"
                 >
                   Logout
                 </button>
