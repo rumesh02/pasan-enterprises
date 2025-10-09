@@ -2,192 +2,198 @@ const Machine = require('../models/Machine');
 const Customer = require('../models/Customer');
 const PastOrder = require('../models/PastOrder');
 
-// @desc    Get dashboard statistics
-// @route   GET /api/dashboard/stats
-// @access  Public
-const getDashboardStats = async (req, res) => {
-  try {
-    const today = new Date();
-    const currentYear = today.getFullYear();
-    const currentMonth = today.getMonth();
-    
-    // Calculate date ranges
-    const startOfYear = new Date(currentYear, 0, 1);
-    const startOfMonth = new Date(currentYear, currentMonth, 1);
-    
-    // Get previous month for growth calculation
-    const startOfPreviousMonth = new Date(currentYear, currentMonth - 1, 1);
-    const endOfPreviousMonth = new Date(currentYear, currentMonth, 0);
-
-    // Total revenue this year
-    const yearlyRevenue = await PastOrder.aggregate([
-      { $match: { createdAt: { $gte: startOfYear } } },
-      { $group: { _id: null, total: { $sum: "$total" } } }
-    ]);
-
-    // Total orders this year
-    const yearlyOrders = await PastOrder.countDocuments({
-      createdAt: { $gte: startOfYear }
-    });
-
-    // Total machines count
-    const totalMachines = await Machine.countDocuments();
-
-    // Total customers count
-    const totalCustomers = await Customer.countDocuments();
-
-    // This month stats
-    const monthlyRevenue = await PastOrder.aggregate([
-      { $match: { createdAt: { $gte: startOfMonth } } },
-      { $group: { _id: null, total: { $sum: "$total" } } }
-    ]);
-
-    const monthlyOrders = await PastOrder.countDocuments({
-      createdAt: { $gte: startOfMonth }
-    });
-
-    // Previous month stats for growth calculation
-    const previousMonthRevenue = await PastOrder.aggregate([
-      { 
-        $match: { 
-          createdAt: { 
-            $gte: startOfPreviousMonth, 
-            $lte: endOfPreviousMonth 
-          } 
-        } 
-      },
-      { $group: { _id: null, total: { $sum: "$total" } } }
-    ]);
-
-    const previousMonthOrders = await PastOrder.countDocuments({
-      createdAt: { 
-        $gte: startOfPreviousMonth, 
-        $lte: endOfPreviousMonth 
-      }
-    });
-
-    // Calculate growth percentages
-    const currentMonthRevenue = monthlyRevenue[0]?.total || 0;
-    const prevMonthRevenue = previousMonthRevenue[0]?.total || 0;
-    const revenueGrowth = prevMonthRevenue > 0 
-      ? ((currentMonthRevenue - prevMonthRevenue) / prevMonthRevenue * 100).toFixed(1)
-      : currentMonthRevenue > 0 ? 100 : 0;
-
-    const currentMonthOrders = monthlyOrders;
-    const prevMonthOrders = previousMonthOrders;
-    const ordersGrowth = prevMonthOrders > 0 
-      ? ((currentMonthOrders - prevMonthOrders) / prevMonthOrders * 100).toFixed(1)
-      : currentMonthOrders > 0 ? 100 : 0;
-
-    // Calculate average order value
-    const avgOrderValue = currentMonthOrders > 0 
-      ? (currentMonthRevenue / currentMonthOrders).toFixed(0)
-      : 0;
-
-    // Top selling items this month
-    const topItems = await PastOrder.aggregate([
-      { $match: { createdAt: { $gte: startOfMonth } } },
-      { $unwind: "$items" },
-      {
-        $group: {
-          _id: "$items.name",
-          totalQuantity: { $sum: "$items.quantity" },
-          totalRevenue: { $sum: "$items.subtotal" }
-        }
-      },
-      { $sort: { totalQuantity: -1 } },
-      { $limit: 5 }
-    ]);
-
-    res.json({
-      success: true,
-      data: {
-        topCards: {
-          totalRevenueYear: yearlyRevenue[0]?.total || 0,
-          totalOrdersYear: yearlyOrders,
-          totalMachines: totalMachines,
-          totalCustomers: totalCustomers
-        },
-        thisMonth: {
-          totalOrders: currentMonthOrders,
-          revenue: currentMonthRevenue,
-          growth: {
-            orders: parseFloat(ordersGrowth),
-            revenue: parseFloat(revenueGrowth)
-          },
-          avgOrderValue: parseFloat(avgOrderValue),
-          completedOrders: Math.floor(currentMonthOrders * 0.95), // Assuming 95% completion rate
-          processingOrders: currentMonthOrders - Math.floor(currentMonthOrders * 0.95),
-          topItems: topItems
-        }
-      }
-    });
-
-  } catch (error) {
-    console.error('Error fetching dashboard stats:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching dashboard statistics',
-      error: error.message
-    });
-  }
-};
-
-// @desc    Get monthly revenue data for the last 12 months
+// @desc    Get monthly revenue for current month
 // @route   GET /api/dashboard/monthly-revenue
 // @access  Public
 const getMonthlyRevenue = async (req, res) => {
   try {
     const today = new Date();
-    const currentYear = today.getFullYear();
-    const currentMonth = today.getMonth();
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59);
 
-    // Generate 12 months of data ending with current month
-    const monthlyData = [];
-    
-    for (let i = 11; i >= 0; i--) {
-      let targetMonth = currentMonth - i;
-      let targetYear = currentYear;
-      
-      // Handle year boundary
-      if (targetMonth < 0) {
-        targetMonth += 12;
-        targetYear--;
+    // Get all orders from this month
+    const monthOrders = await PastOrder.find({
+      createdAt: {
+        $gte: startOfMonth,
+        $lte: endOfMonth
       }
-      
-      const startOfMonth = new Date(targetYear, targetMonth, 1);
-      const endOfMonth = new Date(targetYear, targetMonth + 1, 0);
-      
-      // Get revenue for this month
-      const monthRevenue = await PastOrder.aggregate([
-        { 
-          $match: { 
-            createdAt: { 
-              $gte: startOfMonth, 
-              $lte: endOfMonth 
-            } 
-          } 
-        },
-        { $group: { _id: null, total: { $sum: "$total" } } }
-      ]);
+    }).select('finalTotal total').lean();
 
-      // Get order count for this month
-      const monthOrders = await PastOrder.countDocuments({
-        createdAt: { 
-          $gte: startOfMonth, 
-          $lte: endOfMonth 
+    // Calculate total revenue (use finalTotal which includes VAT, discount, extras)
+    const monthlyRevenue = monthOrders.reduce((sum, order) => {
+      return sum + (order.finalTotal || order.total || 0);
+    }, 0);
+
+    res.json({
+      success: true,
+      data: {
+        revenue: monthlyRevenue,
+        orderCount: monthOrders.length,
+        month: today.toLocaleString('en-US', { month: 'long' }),
+        year: today.getFullYear()
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching monthly revenue:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching monthly revenue',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Get total revenue from all orders
+// @route   GET /api/dashboard/total-orders
+// @access  Public
+const getTotalOrders = async (req, res) => {
+  try {
+    // Get all orders
+    const allOrders = await PastOrder.find().select('finalTotal total').lean();
+
+    // Calculate total revenue (use finalTotal which includes VAT, discount, extras)
+    const totalRevenue = allOrders.reduce((sum, order) => {
+      return sum + (order.finalTotal || order.total || 0);
+    }, 0);
+
+    res.json({
+      success: true,
+      data: {
+        revenue: totalRevenue,
+        orderCount: allOrders.length,
+        description: 'All time revenue'
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching total orders:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching total orders',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Get low stock items count (quantity < 3)
+// @route   GET /api/dashboard/low-stock
+// @access  Public
+const getLowStock = async (req, res) => {
+  try {
+    // Count machines with quantity < 3
+    const lowStockCount = await Machine.countDocuments({
+      quantity: { $lt: 3 }
+    });
+
+    // Optional: Get the actual items for reference
+    const lowStockItems = await Machine.find({
+      quantity: { $lt: 3 }
+    }).select('itemId name quantity').lean();
+
+    res.json({
+      success: true,
+      data: {
+        count: lowStockCount,
+        items: lowStockItems,
+        threshold: 3
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching low stock items:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching low stock items',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Get total items in inventory
+// @route   GET /api/dashboard/total-items
+// @access  Public
+const getTotalItems = async (req, res) => {
+  try {
+    // Count all machines in inventory
+    const totalItems = await Machine.countDocuments();
+
+    // Optional: Get category breakdown
+    const categoryBreakdown = await Machine.aggregate([
+      {
+        $group: {
+          _id: '$category',
+          count: { $sum: 1 }
         }
+      },
+      {
+        $sort: { count: -1 }
+      }
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        count: totalItems,
+        categoryBreakdown,
+        description: 'In inventory'
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching total items:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching total items',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Get monthly revenue data for the entire year (bar chart)
+// @route   GET /api/dashboard/monthly-graph
+// @access  Public
+const getMonthlyGraph = async (req, res) => {
+  try {
+    const today = new Date();
+    const currentYear = today.getFullYear();
+
+    // Month names
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    // Get all orders for the current year
+    const yearStart = new Date(currentYear, 0, 1);
+    const yearEnd = new Date(currentYear, 11, 31, 23, 59, 59);
+
+    const allOrders = await PastOrder.find({
+      createdAt: {
+        $gte: yearStart,
+        $lte: yearEnd
+      }
+    }).select('finalTotal total createdAt').lean();
+
+    // Generate data for all 12 months
+    const monthlyData = [];
+
+    for (let month = 0; month < 12; month++) {
+      const monthStart = new Date(currentYear, month, 1);
+      const monthEnd = new Date(currentYear, month + 1, 0, 23, 59, 59);
+
+      // Filter orders for this month
+      const monthOrders = allOrders.filter(order => {
+        const orderDate = new Date(order.createdAt);
+        return orderDate >= monthStart && orderDate <= monthEnd;
       });
 
-      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                         'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      
+      // Calculate revenue (use finalTotal which includes VAT, discount, extras)
+      const revenue = monthOrders.reduce((sum, order) => {
+        return sum + (order.finalTotal || order.total || 0);
+      }, 0);
+
       monthlyData.push({
-        month: monthNames[targetMonth],
-        year: targetYear,
-        revenue: monthRevenue[0]?.total || 0,
-        orders: monthOrders,
-        isCurrentMonth: targetYear === currentYear && targetMonth === currentMonth
+        month: monthNames[month],
+        revenue: revenue
       });
     }
 
@@ -197,16 +203,19 @@ const getMonthlyRevenue = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error fetching monthly revenue:', error);
+    console.error('Error fetching monthly graph data:', error);
     res.status(500).json({
       success: false,
-      message: 'Error fetching monthly revenue data',
+      message: 'Error fetching monthly graph data',
       error: error.message
     });
   }
 };
 
 module.exports = {
-  getDashboardStats,
-  getMonthlyRevenue
+  getMonthlyRevenue,
+  getTotalOrders,
+  getLowStock,
+  getTotalItems,
+  getMonthlyGraph
 };

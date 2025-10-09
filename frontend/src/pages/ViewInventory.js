@@ -129,16 +129,28 @@ const ViewInventory = () => {
     setShowDetailsModal(true);
     setSalesStats(null);
     
-    // Fetch sales statistics
+    // Fetch sales statistics with timeout
     try {
       setLoadingStats(true);
-      const response = await pastOrdersAPI.getMachineSalesStats(machine._id);
+      
+      // Create a timeout promise
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Request timeout')), 15000)
+      );
+      
+      // Race between the API call and timeout
+      const response = await Promise.race([
+        pastOrdersAPI.getMachineSalesStats(machine._id),
+        timeoutPromise
+      ]);
+      
       if (response.data.success) {
         setSalesStats(response.data.data);
       }
     } catch (err) {
       console.error('Error fetching sales stats:', err);
-      setSalesStats(null);
+      // Set to zero instead of null to show "No sales" rather than error
+      setSalesStats({ totalSold: 0 });
     } finally {
       setLoadingStats(false);
     }

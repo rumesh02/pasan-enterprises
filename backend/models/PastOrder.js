@@ -94,7 +94,7 @@ const extraChargeSchema = new mongoose.Schema({
 const pastOrderSchema = new mongoose.Schema({
   orderId: {
     type: String,
-    unique: true,
+    unique: true, // Index defined here
     default: function() {
       // Generate order ID: ORD-YYYYMMDD-XXXXX
       const date = new Date();
@@ -211,10 +211,11 @@ const pastOrderSchema = new mongoose.Schema({
 
 // Indexes for better query performance
 pastOrderSchema.index({ customerId: 1 });
-pastOrderSchema.index({ orderId: 1 }, { unique: true });
+// orderId index is now defined in the schema field itself with unique: true
 pastOrderSchema.index({ createdAt: -1 });
 pastOrderSchema.index({ 'customerInfo.phone': 1 });
 pastOrderSchema.index({ 'customerInfo.name': 'text' });
+pastOrderSchema.index({ 'items.machineId': 1 }); // Index for machine sales stats queries
 
 // Pre-save middleware to calculate totals
 pastOrderSchema.pre('save', function(next) {

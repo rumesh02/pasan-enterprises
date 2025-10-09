@@ -1,18 +1,18 @@
 const express = require('express');
 const router = express.Router();
 const {
-  getDashboardStats,
-  getMonthlyRevenue
+  getMonthlyRevenue,
+  getTotalOrders,
+  getLowStock,
+  getTotalItems,
+  getMonthlyGraph
 } = require('../controllers/dashboardController');
 
-// @route   GET /api/dashboard/stats
-// @desc    Get dashboard statistics
-// @access  Public
-router.get('/stats', getDashboardStats);
-
-// @route   GET /api/dashboard/monthly-revenue
-// @desc    Get monthly revenue data for the last 12 months
-// @access  Public
+// Dashboard routes
 router.get('/monthly-revenue', getMonthlyRevenue);
+router.get('/total-orders', getTotalOrders);
+router.get('/low-stock', getLowStock);
+router.get('/total-items', getTotalItems);
+router.get('/monthly-graph', getMonthlyGraph);
 
 module.exports = router;
